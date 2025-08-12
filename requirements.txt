@@ -1,4 +1,6 @@
 openai
 chromadb
-streamlit
-tqdm
+langchain
+langchain-openai
+langchain-community
+flask

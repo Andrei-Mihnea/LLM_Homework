@@ -2,9 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
-COPY . .
-
+COPY requirements.txt .       
 RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["python", "app.py"]
+COPY . . 
+COPY templates/ templates/                      
+
+EXPOSE 5000                  
+CMD ["python", "src/app.py"]   

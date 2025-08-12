@@ -7,7 +7,7 @@ services:
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
     ports:
-      - "8501:8501"  # Only if using Streamlit or a web app
+      - "5000:5000"  # Flask default port
     volumes:
       - .:/app
       - ./embeddings:/app/embeddings
