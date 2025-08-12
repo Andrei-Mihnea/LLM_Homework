@@ -4,13 +4,11 @@ import json
 import openai
 from chromadb import PersistentClient
 from tqdm import tqdm
+from file_paths import SUMMARY_FILE, CACHE_FILE, CHROMA_PATH, COLLECTION_NAME
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-SUMMARY_FILE = "data/book_summaries.txt"
-CACHE_FILE = "embeddings/cache.json"
-CHROMA_PATH = "embeddings/chroma_book_summaries"
-COLLECTION_NAME = "books"
+
 
 # Load summaries
 
