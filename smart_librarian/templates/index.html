@@ -1,28 +1,43 @@
-<!-- templates/index.html -->
 <!DOCTYPE html>
 <html>
 <head>
     <title>Smart Librarian</title>
     <style>
         body { font-family: sans-serif; margin: 2em; }
-        .result { margin-top: 1em; border-bottom: 1px solid #ddd; padding-bottom: 1em; }
+        input[type="text"] { width: 60%; padding: 0.5em; }
+        button { padding: 0.5em 1em; }
+        .result { margin-top: 1em; padding: 1em; border-bottom: 1px solid #ddd; }
         .title { font-weight: bold; font-size: 1.2em; }
-        .score { font-size: 0.9em; color: gray; }
+        .score { color: #999; font-size: 0.9em; }
+        .chat-reply {
+            margin-top: 2em;
+            padding: 1em;
+            background-color: #f3f3f3;
+            border-left: 5px solid #0074d9;
+        }
     </style>
 </head>
 <body>
     <h1>📚 Smart Librarian</h1>
+
     <form method="post">
-        <input name="query" type="text" placeholder="e.g. magie și prietenie" value="{{ query }}" style="width: 60%;" />
-        <button type="submit">Caută</button>
+        <input type="text" name="query" placeholder="e.g. magie, prietenie, război..." value="{{ query }}" />
+        <button type="submit">🔍 Search</button>
     </form>
 
+    {% if gpt_reply %}
+    <div class="chat-reply">
+        <h3>🤖 Smart Librarian says:</h3>
+        <p>{{ gpt_reply }}</p>
+    </div>
+    {% endif %}
+
     {% if results %}
-        <h2>📖 Recomandări:</h2>
+        <h2>📖 Matched Summaries:</h2>
         {% for r in results %}
         <div class="result">
             <div class="title">{{ r.title }}</div>
-            <div class="score">Relevanță: {{ r.score }}</div>
+            <div class="score">Relevance: {{ r.score }}</div>
             <p>{{ r.summary }}</p>
         </div>
         {% endfor %}
