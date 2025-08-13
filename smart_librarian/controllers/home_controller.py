@@ -1,5 +1,5 @@
-
-from flask import render_template, request
+from flask import render_template, request, redirect
+from smart_librarian.utils.auth_guard import current_user
 from smart_librarian.models.book_model import load_summaries, build_vectorstore
 from smart_librarian.models.cache import load_cache, save_cache
 from openai import OpenAI
@@ -8,15 +8,28 @@ import os
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 cache = load_cache()
 
+def require_login_redirect():
+    user = current_user()
+    if not user:
+        return None, redirect("/auth/index")
+    return user, None
+
 class HomeController:
     def __init__(self):
         self.summaries = load_summaries()
         self.vectorstore = build_vectorstore(self.summaries)
 
     def index(self):
+        user, redirect_resp = require_login_redirect()
+        if redirect_resp:  # not logged in
+            return redirect_resp
         return render_template("index.html", query="", results=[], gpt_reply="")
 
     def search(self):
+        user, redirect_resp = require_login_redirect()
+        if redirect_resp:
+            return redirect_resp
+
         query = request.form.get("query", "")
         results = []
         gpt_reply = ""

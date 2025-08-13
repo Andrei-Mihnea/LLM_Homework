@@ -3,4 +3,9 @@ chromadb
 langchain
 langchain-openai
 langchain-community
+langchain-chroma>=0.1.0
 flask
+SQLAlchemy
+psycopg2-binary
+bcrypt
+PyJWT

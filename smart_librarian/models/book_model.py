@@ -1,10 +1,10 @@
 import os
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain.schema import Document
 from langchain.text_splitter import CharacterTextSplitter
 from pathlib import Path
-from file_paths import SUMMARY_FILE, CHROMA_DIR
+from src.file_paths import SUMMARY_FILE, CHROMA_DIR
 
 
 # === Load summaries ===

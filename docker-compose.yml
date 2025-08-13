@@ -1,15 +1,42 @@
-version: '3.9'
-
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: pg-smart-librarian
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: smartlib
+      POSTGRES_USER: smartlib
+      POSTGRES_PASSWORD: smartlib
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      # no shell; simpler & portable
+      test: ["CMD", "pg_isready", "-U", "smartlib", "-d", "smartlib"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   smart-librarian:
     build: .
     container_name: smart-librarian
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DATABASE_URL: "postgresql+psycopg2://smartlib:smartlib@db:5432/smartlib"
+      JWT_SECRET: "change-me-in-prod"
+      JWT_EXPIRES_MIN: "30"
+      FLASK_SECRET_KEY: "dev-secret-change-me"
     ports:
-      - "5000:5000"  # Flask default port
+      - "5000:5000"
     volumes:
       - .:/app
       - ./embeddings:/app/embeddings
     stdin_open: true
     tty: true
+
+volumes:
+  pgdata:
