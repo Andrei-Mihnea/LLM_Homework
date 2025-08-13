@@ -16,64 +16,52 @@
       --ring:rgba(124,153,255,.4);
       --shadow: 0 10px 30px rgba(0,0,0,.35);
       --radius:16px;
-      --radius-sm:12px;
+      --radius-sm:10px;
     }
 
     *{box-sizing:border-box}
     html,body{height:100%}
     body{
       margin:0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Apple Color Emoji","Segoe UI Emoji";
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial;
       background:
         radial-gradient(1200px 800px at 85% -10%, rgba(124,153,255,.18), transparent 60%),
         radial-gradient(1200px 800px at -10% 110%, rgba(90,227,179,.12), transparent 60%),
         var(--bg);
       color:var(--text);
-      display:grid;
-      place-items:center;
-      padding:24px;
+      display:grid; place-items:center; padding:24px;
     }
 
     .shell{
       width:min(920px, 100%);
-      display:grid;
-      grid-template-columns: 1.1fr 1fr;
-      gap:24px;
-      align-items:stretch;
+      display:grid; grid-template-columns: 1.05fr 0.95fr; gap:20px; align-items:stretch;
     }
-    @media (max-width: 860px){
-      .shell{ grid-template-columns: 1fr; }
-    }
+    @media (max-width:860px){ .shell{ grid-template-columns: 1fr; } }
 
     .brand{
       background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
       border:1px solid var(--border);
       box-shadow: var(--shadow);
       border-radius: var(--radius);
-      padding:28px;
-      display:flex;
-      flex-direction:column;
-      justify-content:space-between;
-      min-height: 460px;
+      padding:22px;
+      display:flex; flex-direction:column; justify-content:space-between;
+      min-height:420px;
     }
-    .logo{
-      display:flex; align-items:center; gap:12px;
-    }
+    .logo{ display:flex; align-items:center; gap:12px; }
     .logo-badge{
-      width:42px; height:42px; border-radius:12px;
-      background:
-        linear-gradient(135deg, var(--accent), var(--accent-2));
+      width:38px; height:38px; border-radius:12px;
+      background:linear-gradient(135deg, var(--accent), var(--accent-2));
+      display:grid; place-items:center; color:#0a0a0a; font-weight:800;
       box-shadow: 0 6px 18px rgba(124,153,255,.35);
-      display:grid; place-items:center; color:#0a0a0a; font-weight:700;
     }
-    .brand h1{ margin:6px 0 8px; font-size:28px; letter-spacing:.2px;}
+    .brand h1{ margin:6px 0 8px; font-size:26px; letter-spacing:.2px;}
     .muted{ color:var(--muted); line-height:1.6; }
-    .tips{ display:grid; gap:10px; margin-top:20px; }
+
+    .tips{ display:grid; gap:8px; margin-top:16px; }
     .tip{
       display:flex; gap:10px; align-items:flex-start;
-      padding:10px 12px; border-radius:12px;
-      background:rgba(255,255,255,.03); border:1px dashed var(--border);
-      color:var(--muted); font-size:14px;
+      padding:8px 10px; border-radius:12px; font-size:14px;
+      background:rgba(255,255,255,.03); border:1px dashed var(--border); color:var(--muted);
     }
 
     .card{
@@ -81,68 +69,84 @@
       border:1px solid var(--border);
       box-shadow: var(--shadow);
       border-radius: var(--radius);
-      padding: 22px;
-      display:grid; gap:18px;
+      padding:16px;                /* compact */
+      display:grid; gap:14px;
     }
 
+    /* COMPACT, EQUAL-WIDTH TABS */
     .tabs{
-      display:flex; gap:8px; background: rgba(255,255,255,.03);
-      padding:6px; border-radius: 12px; border:1px solid var(--border);
-      align-items:center;
+      display: grid;
+      grid-template-columns: 1fr 1fr; /* equal widths */
+      background: rgba(255,255,255,0.02);
+      border-radius: 8px;
+      border:1px solid var(--border);
+      overflow: hidden;              /* flush rounded corners */
+      width: 220px;                  /* compact overall size */
+      height: 36px;                  /* fixed equal height */
+      margin: 0 auto 10px auto;      /* centered */
     }
     .tab{
-      flex:1; text-align:center; padding:10px 12px; border-radius:10px;
-      color:var(--muted); cursor:pointer; user-select:none; font-weight:600; letter-spacing:.2px;
+      display:flex; align-items:center; justify-content:center;
+      height:100%; padding:0;        /* height controlled by .tabs */
+      color:var(--muted);
+      cursor:pointer; user-select:none;
+      font-weight:600; font-size:13px; letter-spacing:.2px;
       transition: all .18s ease;
     }
     .tab.active{
-      background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
-      color:var(--text); box-shadow: inset 0 0 0 1px var(--border), 0 8px 16px rgba(0,0,0,.25);
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+      color:var(--text);
+      box-shadow: inset 0 0 0 1px var(--border);
     }
+    .tab:hover{ color:var(--accent-2); }
 
-    form{ display:grid; gap:14px; margin-top:6px; }
+    form{ display:grid; gap:12px; margin-top:2px; }
     label{ font-size:12px; color:var(--muted); letter-spacing:.3px; }
+    .row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    @media (max-width:420px){ .row{ grid-template-columns:1fr; } }
+
     .input{
-      width:100%; padding:12px 14px; border-radius:12px;
-      background: #0e1116; color:var(--text);
+      width:100%; padding:11px 12px; border-radius:12px;  /* compact */
+      background:#0e1116; color:var(--text);
       border:1px solid var(--border);
-      outline: none; transition: border-color .18s, box-shadow .18s;
+      outline:none; transition: border-color .18s, box-shadow .18s;
+      font-size:14px;
     }
-    .input:focus{
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--ring);
-    }
-    .row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-    @media (max-width: 420px){ .row{ grid-template-columns:1fr; } }
+    .input:focus{ border-color:var(--accent); box-shadow: 0 0 0 3px var(--ring); }
 
     .btn{
       appearance:none; border:0; cursor:pointer; font-weight:700;
-      padding:12px 14px; border-radius:12px; letter-spacing:.3px;
-      background: linear-gradient(135deg, var(--accent), #6c86ff);
-      color:#0b0d10;
-      box-shadow: 0 10px 20px rgba(124,153,255,.35);
+      padding:11px 14px; border-radius:12px; letter-spacing:.3px;  /* compact */
+      background:linear-gradient(135deg, var(--accent), #6c86ff);
+      color:#0b0d10; box-shadow: 0 10px 20px rgba(124,153,255,.35);
       transition: transform .08s ease, box-shadow .18s ease, filter .18s ease;
     }
-    .btn:hover{ filter:saturate(1.1); box-shadow: 0 12px 24px rgba(124,153,255,.45); }
+    .btn:hover{ filter:saturate(1.08); box-shadow: 0 12px 24px rgba(124,153,255,.45); }
     .btn:active{ transform: translateY(1px); }
 
     .subtle{
-      background: #0f1318; color:var(--text); border:1px solid var(--border);
-      box-shadow: none;
+      background:#0f1318; color:var(--text);
+      border:1px solid var(--border); box-shadow:none;
     }
-    .helper{
-      display:flex; justify-content:space-between; align-items:center; color:var(--muted); font-size:12px;
-    }
+
+    .helper{ display:flex; justify-content:flex-end; gap:10px; align-items:center; color:var(--muted); font-size:12px; }
     a.link{ color:var(--accent-2); text-decoration:none; }
     a.link:hover{ text-decoration:underline; }
+    .fineprint{ color:var(--muted); font-size:12px; text-align:center; margin-top:2px; }
 
-    .fineprint{ color:var(--muted); font-size:12px; text-align:center; margin-top:6px; }
+    /* ---- Login layout overrides: stack fields, left-align button ---- */
+    #form-login .row{
+      grid-template-columns: 1fr;   /* stack username + password */
+      gap:12px;
+    }
+    #form-login .helper{
+      justify-content: flex-start;  /* button on the left */
+    }
   </style>
 </head>
 <body>
-
   <div class="shell">
-    <!-- Left / brand & tips -->
+    <!-- Left / brand -->
     <section class="brand">
       <div>
         <div class="logo">
@@ -153,18 +157,16 @@
           </div>
         </div>
         <p class="muted">
-          Log in to explore RAG-powered recommendations with CAG caching.
-          Keep it simple, type your vibe, and let the assistant do the rest.
+          Log in to explore AI-powered book recommendations.
+          Keep it simple: type your vibe and we’ll do the rest.
         </p>
-
         <div class="tips">
-          <div class="tip">• Try: <em>“cozy fantasy with strong world-building”</em></div>
-          <div class="tip">• Or: <em>“short sci-fi novellas with bittersweet endings”</em></div>
-          <div class="tip">• Privacy: uses http-only JWT cookies</div>
+          <div class="tip">• Try: <em>“cozy fantasy with found family”</em></div>
+          <div class="tip">• Or: <em>“short sci-fi novellas, bittersweet”</em></div>
+          <div class="tip">• Might: <em>“try as well reading a book from time to time”</em></div>
         </div>
       </div>
       <div class="helper">
-        <span class="muted">Need help?</span>
         <a class="link" href="/home/index">Go to Home</a>
       </div>
     </section>
@@ -189,7 +191,6 @@
           </div>
         </div>
         <div class="helper">
-          <span></span>
           <button class="btn" type="submit">Sign in</button>
         </div>
         <div class="fineprint">No account yet? Switch to <strong>Register</strong> above.</div>
@@ -212,16 +213,15 @@
           <input class="input" id="reg-password" name="password" type="password" required placeholder="Create a password" />
         </div>
         <div class="helper">
-          <span></span>
           <button class="btn subtle" type="submit">Create account</button>
         </div>
-        <div class="fineprint">By registering you agree to our very chill terms.</div>
+        <div class="fineprint">By registering, you agree to our very chill terms.</div>
       </form>
     </section>
   </div>
 
   <script>
-    // tiny tab switcher (no framework, no external assets)
+    // compact tab switcher
     const tabs = document.querySelectorAll('.tab');
     const loginForm = document.getElementById('form-login');
     const registerForm = document.getElementById('form-register');
@@ -235,19 +235,18 @@
       loginForm.style.display = showLogin ? 'grid' : 'none';
       registerForm.style.display = showLogin ? 'none' : 'grid';
 
-      // accessibility
       tabs.forEach(x => x.setAttribute('aria-selected', x === t ? 'true' : 'false'));
     }));
 
-    // basic client-side required check (keeps server-side checks intact)
-    for (const form of [loginForm, registerForm]) {
+    // basic required check
+    [loginForm, registerForm].forEach(form => {
       form.addEventListener('submit', (e) => {
         if (!form.checkValidity()) {
           e.preventDefault();
           alert('Please fill all required fields.');
         }
       });
-    }
+    });
   </script>
 </body>
 </html>

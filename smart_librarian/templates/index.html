@@ -1,36 +1,169 @@
-<!-- index.html -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Smart Librarian</title>
+  <meta charset="utf-8" />
+  <title>Smart Librarian · Search</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0b0d10;
+      --card:#12151a;
+      --muted:#7d8896;
+      --text:#e8edf2;
+      --accent:#7c99ff;
+      --accent-2:#5ae3b3;
+      --border:rgba(255,255,255,0.06);
+      --ring:rgba(124,153,255,.4);
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; padding:24px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial;
+      background:
+        radial-gradient(1200px 800px at 85% -10%, rgba(124,153,255,.18), transparent 60%),
+        radial-gradient(1200px 800px at -10% 110%, rgba(90,227,179,.12), transparent 60%),
+        var(--bg);
+      color:var(--text);
+    }
+
+    .container{ max-width: 1060px; margin: 0 auto; }
+
+    /* header */
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between; gap:16px;
+      margin-bottom: 20px;
+    }
+    .logo{
+      display:flex; align-items:center; gap:12px;
+    }
+    .badge{
+      width:40px; height:40px; border-radius:12px;
+      background:linear-gradient(135deg, var(--accent), var(--accent-2));
+      display:grid; place-items:center; color:#0b0d10; font-weight:800; box-shadow: 0 6px 18px rgba(124,153,255,.35);
+    }
+    .brand-title{ margin:0; font-size:22px; letter-spacing:.2px; }
+    .muted{ color:var(--muted); }
+
+    .nav{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    }
+    .link{
+      color:var(--accent-2); text-decoration:none; font-weight:600;
+      padding:8px 12px; border-radius:10px; border:1px solid var(--border); background: rgba(255,255,255,.03);
+    }
+    .link:hover{ text-decoration:underline; }
+
+    /* search card */
+    .card{
+      background: var(--card);
+      border:1px solid var(--border);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+      padding:18px;
+    }
+    .search{
+      display:grid; gap:12px;
+    }
+    .row{
+      display:grid; grid-template-columns: 1fr auto; gap:12px;
+    }
+    @media (max-width:640px){ .row{ grid-template-columns: 1fr; } }
+
+    .input{
+      width:100%; padding:14px 14px; border-radius:12px;
+      background:#0e1116; color:var(--text);
+      border:1px solid var(--border); outline: none;
+    }
+    .input:focus{ border-color:var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+
+    .btn{
+      appearance:none; border:0; cursor:pointer; font-weight:800; letter-spacing:.3px;
+      padding:14px 16px; border-radius:12px; min-width:120px;
+      background:linear-gradient(135deg, var(--accent), #6c86ff);
+      color:#0b0d10; box-shadow: 0 10px 20px rgba(124,153,255,.35);
+    }
+    .btn:hover{ filter:saturate(1.05) brightness(1.02); }
+
+    /* assistant */
+    .assistant{
+      margin-top:16px; padding:16px; border-radius:14px;
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid var(--border);
+    }
+    .assistant h3{ margin:0 0 8px; font-size:16px; }
+    .assistant p{ margin:0; color:var(--text); line-height:1.6; }
+
+    /* results */
+    .results{
+      display:grid; gap:12px; margin-top:18px;
+    }
+    .result{
+      padding:14px; border-radius:14px; border:1px solid var(--border); background:#0f1318;
+    }
+    .result h4{ margin:0 0 4px; font-size:16px; }
+    .meta{ color:var(--muted); font-size:12px; margin-bottom:8px; }
+    .summary{ margin:0; color:var(--text); line-height:1.6; }
+
+    /* footer */
+    .foot{
+      text-align:center; color:var(--muted); font-size:12px; margin: 18px 0 6px;
+    }
+  </style>
 </head>
 <body>
-    <h1>Smart Librarian</h1>
-    <form action="/home/search" method="POST">
-        <input name="query" type="text" placeholder="e.g. magie, prietenie..." value="{{ query }}">
-        <button type="submit">Search</button>
-    </form>
+  <div class="container">
 
-    {% if gpt_reply %}
-        <div style="margin-top: 20px; background-color: #f0f0f0; padding: 10px;">
-            <h3>🤖 Assistant:</h3>
-            <p>{{ gpt_reply }}</p>
+    <!-- header -->
+    <header class="topbar">
+      <div class="logo">
+        <div class="badge">SL</div>
+        <div>
+          <h1 class="brand-title">Smart Librarian</h1>
+          <div class="muted" style="font-size:12px">RAG + CAG recommendations</div>
         </div>
-    {% endif %}
+      </div>
+      <nav class="nav">
+        <a class="link" href="/auth/index">Auth</a>
+        <a class="link" href="/auth/logout">Logout</a>
+      </nav>
+    </header>
 
-    {% if results %}
-        <h2>Results:</h2>
-        {% for r in results %}
-            <div style="margin-bottom: 10px;">
-                <b>{{ r.title }}</b><br>
-                <small>Relevance: {{ r.score }}</small><br>
-                <p>{{ r.summary }}</p>
-            </div>
-        {% endfor %}
-    {% endif %}
+    <!-- search -->
+    <section class="card">
+      <form class="search" action="/home/search" method="POST">
+        <div class="row">
+          <input class="input" name="query" type="text" placeholder="e.g. cozy fantasy, found family, space opera…" value="{{ query|default('', true) }}">
+          <button class="btn" type="submit">Search</button>
+        </div>
+        <div class="muted" style="font-size:12px">
+          Tip: describe a vibe or theme. We’ll retrieve summaries and craft a conversational rec.
+        </div>
+      </form>
 
-    <br>
-    <a href="/auth/login">Login</a> | <a href="/auth/register">Register</a>
-    <a href="/auth/logout">Logout</a>
+      {% if gpt_reply %}
+        <div class="assistant">
+          <h3>🤖 Assistant</h3>
+          <p>{{ gpt_reply }}</p>
+        </div>
+      {% endif %}
+
+      {% if results %}
+        <div class="results">
+          {% for r in results %}
+            <article class="result">
+              <h4>{{ r.title }}</h4>
+              <div class="meta">Relevance: {{ r.score }}</div>
+              <p class="summary">{{ r.summary }}</p>
+            </article>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </section>
+
+    <p class="foot">Built with ❤️ · minimal, accessible, no external assets</p>
+  </div>
 </body>
 </html>
