@@ -1,169 +1,129 @@
+<!-- templates/index.html -->
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="utf-8" />
-  <title>Smart Librarian · Search</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8"/>
+  <title>Smart Librarian</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <style>
     :root{
-      --bg:#0b0d10;
-      --card:#12151a;
-      --muted:#7d8896;
-      --text:#e8edf2;
-      --accent:#7c99ff;
-      --accent-2:#5ae3b3;
-      --border:rgba(255,255,255,0.06);
-      --ring:rgba(124,153,255,.4);
-      --shadow: 0 10px 30px rgba(0,0,0,.35);
-      --radius:16px;
+      --bg:#0b0d10; --panel:#11151b; --muted:#7d8896; --text:#e8edf2; --border:rgba(255,255,255,.06);
+      --accent1:#7c99ff; --accent2:#6c86ff; --accent3:#5ae3b3;
     }
     *{box-sizing:border-box}
-    html,body{height:100%}
     body{
-      margin:0; padding:24px;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial;
-      background:
-        radial-gradient(1200px 800px at 85% -10%, rgba(124,153,255,.18), transparent 60%),
-        radial-gradient(1200px 800px at -10% 110%, rgba(90,227,179,.12), transparent 60%),
-        var(--bg);
-      color:var(--text);
+      margin:0;background:var(--bg);color:var(--text);
+      font-family:system-ui,Segoe UI,Inter,Arial;
+      height:100vh;display:grid;grid-template-columns:280px 1fr;
     }
 
-    .container{ max-width: 1060px; margin: 0 auto; }
+    .side{border-right:1px solid var(--border);background:#0f1216;height:100vh;display:flex;flex-direction:column}
+    .side .top{padding:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+    .btn{display:inline-block;padding:8px 10px;background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#0b0d10;border-radius:10px;text-decoration:none;font-weight:700}
+    .list{padding:10px;display:flex;flex-direction:column;gap:8px;overflow:auto}
+    .row{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px}
+    .row a{color:var(--accent3);text-decoration:none}
+    .row small{color:var(--muted);display:block;margin-top:4px}
+    .row form{margin-top:8px}
+    .danger{padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:#190e11;color:#ffb3c0;cursor:pointer}
 
-    /* header */
-    .topbar{
-      display:flex; align-items:center; justify-content:space-between; gap:16px;
-      margin-bottom: 20px;
-    }
-    .logo{
-      display:flex; align-items:center; gap:12px;
-    }
-    .badge{
-      width:40px; height:40px; border-radius:12px;
-      background:linear-gradient(135deg, var(--accent), var(--accent-2));
-      display:grid; place-items:center; color:#0b0d10; font-weight:800; box-shadow: 0 6px 18px rgba(124,153,255,.35);
-    }
-    .brand-title{ margin:0; font-size:22px; letter-spacing:.2px; }
-    .muted{ color:var(--muted); }
+    .main{height:100vh;display:flex;flex-direction:column}
+    .bar{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:#0f1216}
+    .area{flex:1;display:flex;justify-content:center}
+    .inner{width:min(900px,100%);padding:16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+    .bubble{max-width:75%;padding:10px 12px;border-radius:14px;border:1px solid var(--border);line-height:1.5;white-space:pre-wrap}
+    .user{align-self:flex-end;background:#0e1116}
+    .assistant{align-self:flex-start;background:#141a23}
+    .meta{font-size:12px;color:var(--muted);margin:4px 2px}
 
-    .nav{
-      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
-    }
-    .link{
-      color:var(--accent-2); text-decoration:none; font-weight:600;
-      padding:8px 12px; border-radius:10px; border:1px solid var(--border); background: rgba(255,255,255,.03);
-    }
-    .link:hover{ text-decoration:underline; }
+    .composer{padding:10px;border-top:1px solid var(--border);background:#10141a}
+    form.chat{display:flex;gap:8px;align-items:flex-start}
+    .field{flex:1;display:flex;flex-direction:column;gap:8px}
+    .field label{font-size:12px;color:var(--muted)}
+    input[type="text"]{flex:1;background:#0e1116;border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px}
+    .actions{display:flex;gap:8px}
+    button.send{padding:10px 12px;border-radius:10px;border:0;background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#0b0d10;font-weight:800;cursor:pointer}
 
-    /* search card */
-    .card{
-      background: var(--card);
-      border:1px solid var(--border);
-      box-shadow: var(--shadow);
-      border-radius: var(--radius);
-      padding:18px;
-    }
-    .search{
-      display:grid; gap:12px;
-    }
-    .row{
-      display:grid; grid-template-columns: 1fr auto; gap:12px;
-    }
-    @media (max-width:640px){ .row{ grid-template-columns: 1fr; } }
+    .empty{opacity:.7;color:var(--muted);padding:24px;text-align:center}
 
-    .input{
-      width:100%; padding:14px 14px; border-radius:12px;
-      background:#0e1116; color:var(--text);
-      border:1px solid var(--border); outline: none;
-    }
-    .input:focus{ border-color:var(--accent); box-shadow: 0 0 0 3px var(--ring); }
-
-    .btn{
-      appearance:none; border:0; cursor:pointer; font-weight:800; letter-spacing:.3px;
-      padding:14px 16px; border-radius:12px; min-width:120px;
-      background:linear-gradient(135deg, var(--accent), #6c86ff);
-      color:#0b0d10; box-shadow: 0 10px 20px rgba(124,153,255,.35);
-    }
-    .btn:hover{ filter:saturate(1.05) brightness(1.02); }
-
-    /* assistant */
-    .assistant{
-      margin-top:16px; padding:16px; border-radius:14px;
-      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
-      border:1px solid var(--border);
-    }
-    .assistant h3{ margin:0 0 8px; font-size:16px; }
-    .assistant p{ margin:0; color:var(--text); line-height:1.6; }
-
-    /* results */
-    .results{
-      display:grid; gap:12px; margin-top:18px;
-    }
-    .result{
-      padding:14px; border-radius:14px; border:1px solid var(--border); background:#0f1318;
-    }
-    .result h4{ margin:0 0 4px; font-size:16px; }
-    .meta{ color:var(--muted); font-size:12px; margin-bottom:8px; }
-    .summary{ margin:0; color:var(--text); line-height:1.6; }
-
-    /* footer */
-    .foot{
-      text-align:center; color:var(--muted); font-size:12px; margin: 18px 0 6px;
-    }
+    .nav-links{display:flex;gap:12px;align-items:center}
+    .logout-btn{padding:6px 10px;border-radius:8px;background:#190e11;color:#ffb3c0;text-decoration:none;font-weight:600;border:1px solid var(--border)}
   </style>
 </head>
 <body>
-  <div class="container">
+  <!-- Sidebar -->
+  <aside class="side">
+    <div class="top">
+      <strong>Chats</strong>
+      <a class="btn" href="/home/new">+ New</a>
+    </div>
+    <div class="list">
+      {% if conversations %}
+        {% for c in conversations %}
+          <div class="row">
+            <a href="/home/open/{{ c.id }}">{{ c.title }}</a>
+            <small>Updated {{ c.updated_at }}</small>
+            <form action="/home/delete/{{ c.id }}" method="POST">
+              <button class="danger" type="submit">Delete</button>
+            </form>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="row">No conversations yet.</div>
+      {% endif %}
+    </div>
+  </aside>
 
-    <!-- header -->
-    <header class="topbar">
-      <div class="logo">
-        <div class="badge">SL</div>
-        <div>
-          <h1 class="brand-title">Smart Librarian</h1>
-          <div class="muted" style="font-size:12px">RAG + CAG recommendations</div>
-        </div>
+  <!-- Main chat -->
+  <main class="main">
+    <div class="bar">
+      <div>
+        {% if current %}
+          <span style="color:#9fb3c8">#{{ current.id }}</span>
+          <span style="margin-left:6px">{{ current.title }}</span>
+        {% else %}
+          <span style="color:#9fb3c8">No chat selected</span>
+        {% endif %}
       </div>
-      <nav class="nav">
-        <a class="link" href="/auth/index">Auth</a>
-        <a class="link" href="/auth/logout">Logout</a>
-      </nav>
-    </header>
+      <div class="nav-links">
+        <a style="color:var(--accent3);text-decoration:none" href="/home/index">Home</a>
+        <a class="logout-btn" href="/auth/logout">Logout</a>
+      </div>
+    </div>
 
-    <!-- search -->
-    <section class="card">
-      <form class="search" action="/home/search" method="POST">
-        <div class="row">
-          <input class="input" name="query" type="text" placeholder="e.g. cozy fantasy, found family, space opera…" value="{{ query|default('', true) }}">
-          <button class="btn" type="submit">Search</button>
-        </div>
-        <div class="muted" style="font-size:12px">
-          Tip: describe a vibe or theme. We’ll retrieve summaries and craft a conversational rec.
-        </div>
-      </form>
-
-      {% if gpt_reply %}
-        <div class="assistant">
-          <h3>🤖 Assistant</h3>
-          <p>{{ gpt_reply }}</p>
-        </div>
-      {% endif %}
-
-      {% if results %}
-        <div class="results">
-          {% for r in results %}
-            <article class="result">
-              <h4>{{ r.title }}</h4>
-              <div class="meta">Relevance: {{ r.score }}</div>
-              <p class="summary">{{ r.summary }}</p>
-            </article>
+    <div class="area">
+      <div class="inner" id="scroll">
+        {% if current and current.messages %}
+          {% for m in current.messages %}
+            <div class="meta">{{ loop.index }} · {{ m.role }}</div>
+            <div class="bubble {% if m.role == 'user' %}user{% else %}assistant{% endif %}">{{ m.content }}</div>
           {% endfor %}
-        </div>
-      {% endif %}
-    </section>
+        {% else %}
+          <div class="empty">Start a new chat or select one from the left.</div>
+        {% endif %}
+      </div>
+    </div>
 
-    <p class="foot">Built with ❤️ · minimal, accessible, no external assets</p>
-  </div>
+    <div class="composer">
+      {% if current %}
+        <form class="chat" action="/home/send/{{ current.id }}" method="POST" autocomplete="off">
+          <div class="field" style="max-width:720px">
+            <label for="message">Your message</label>
+            <input id="message" type="text" name="message" placeholder="Ask for cozy fantasy with found family..." required />
+          </div>
+          <div class="actions">
+            <button class="send" type="submit">Send</button>
+          </div>
+        </form>
+      {% else %}
+        <a class="btn" href="/home/new">Create your first chat</a>
+      {% endif %}
+    </div>
+  </main>
+
+  <script>
+    const sc = document.getElementById('scroll');
+    if (sc) sc.scrollTop = sc.scrollHeight;
+  </script>
 </body>
 </html>
