@@ -4,9 +4,11 @@ from smart_librarian import create_app
 from smart_librarian.router import Router
 from flask import request
 from smart_librarian.models.user_db import init_db
+from smart_librarian.models.chat_db import init_chat_db
 app = create_app()
 router = Router()
 init_db()
+init_chat_db()
 
 @app.route('/', defaults={'path': ''}, methods=['GET', 'POST'])
 @app.route('/<path:path>', methods=['GET', 'POST'] )
