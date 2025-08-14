@@ -58,19 +58,19 @@ def query_books(vectorstore, query, top_k=3):
         print(f"{i+1}. {doc.metadata['title']} (score: {score:.2f})")
         print(f"   ➤ {doc.page_content}\n")
 
-# === CLI Driver ===
-if __name__ == "__main__":
-    print("📚 Loading book summaries...")
-    docs = load_summaries()
+# # === CLI Driver ===
+# if __name__ == "__main__":
+#     print("📚 Loading book summaries...")
+#     docs = load_summaries()
     
-    print("🔗 Initializing vector store with LangChain...")
-    vectorstore = build_vectorstore(docs)
+#     print("🔗 Initializing vector store with LangChain...")
+#     vectorstore = build_vectorstore(docs)
 
-    print("\n🤖 Ready to chat with RAG!")
-    while True:
-        query = input("\nEnter a theme or interest (or 'exit'): ")
-        if query.strip().lower() in ["exit", "quit"]:
-            break
-        query_books(vectorstore, query)
+#     print("\n🤖 Ready to chat with RAG!")
+#     while True:
+#         query = input("\nEnter a theme or interest (or 'exit'): ")
+#         if query.strip().lower() in ["exit", "quit"]:
+#             break
+#         query_books(vectorstore, query)
 
 

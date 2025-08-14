@@ -100,7 +100,7 @@ class HomeController:
                 {"role": "user", "content": user_msg},
             ]
             ai = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-3.5-turbo",
                 messages=messages,
                 temperature=0.6,
             )
@@ -112,6 +112,7 @@ class HomeController:
 
     # POST /home/delete/<id>  → delete conversation
     def delete(self, conv_id: int):
+        from flask import redirect
         user = current_user()
         if not user:
             return redirect("/auth/index")
