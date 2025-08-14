@@ -25,7 +25,7 @@ class AuthController:
         password = request.form.get('password', '')
 
         if User.exists_password_and_user(username, password):
-            token = create_jwt({"sub": username})  # subject = username
+            token = create_jwt({"sub": username})  #subject = username
 
             resp = make_response(redirect("/home/index"))
             resp.set_cookie(

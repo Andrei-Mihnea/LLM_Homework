@@ -1,5 +1,5 @@
 # smart_librarian/controllers/home_controller.py
-from flask import render_template, request, make_response
+from flask import render_template, request, make_response, jsonify
 from smart_librarian.utils.auth_guard import current_user  # your login helper
 from smart_librarian.models.book_model import load_summaries, build_vectorstore
 from smart_librarian.models.chat_db import Conversation
@@ -28,6 +28,22 @@ class HomeController:
             current = Conversation.get_conversation(user, convs[0]["id"])
 
         return render_template("index.html", conversations=convs, current=current)
+    
+    def messages(self,conv_id: int):
+        user = current_user()
+        if not user:
+            return jsonify({"error": "unauthorized"}), 401
+
+        conv = Conversation.get_conversation(user, int(conv_id))
+        if not conv:
+            return jsonify({"error": "not_found"}), 404
+
+        return jsonify({
+            "id": conv["id"],
+            "title": conv["title"],
+            "messages": conv.get("messages", []),
+            "updated_at": str(conv.get("updated_at"))
+        })
 
     # GET /home/open/<id>  → open a specific conversation
     def open(self, conv_id: int):
@@ -57,35 +73,34 @@ class HomeController:
     def send(self, conv_id: int):
         user = current_user()
         if not user:
-            from flask import redirect
-            return redirect("/auth/index")
+            return jsonify({"error": "unauthorized"}), 401
 
+        data = request.get_json(silent=True) or {}
+        user_msg = (data.get("message") or "").strip()
+        if not user_msg:
+            return jsonify({"error": "empty_message"}), 400
+
+        # Ensure conversation exists
         conv = Conversation.get_conversation(user, int(conv_id))
         if not conv:
-            from flask import redirect
-            cid = Conversation.create_conversation(user, "New chat")
-            return redirect(f"/home/open/{cid}")
+            conv_id = Conversation.create_conversation(user, "New chat")
+            conv = Conversation.get_conversation(user, int(conv_id))
 
-        user_msg = (request.form.get("message") or "").strip()
-        if not user_msg:
-            from flask import redirect
-            return redirect(f"/home/open/{conv_id}")
-
-        # First user message → title
+        # First user message => set title
         if not conv.get("messages"):
             Conversation.set_title(user, int(conv_id), user_msg[:60])
 
-        # Save user message
+        # Save user msg
         Conversation.add_message(user, int(conv_id), "user", user_msg)
 
-        # RAG retrieval
+        # RAG context
         docs = self.vectorstore.similarity_search_with_relevance_scores(user_msg, k=3)
         context_text = "\n\n".join([
             f"Title: {doc.metadata.get('title','Untitled')}\nRelevance: {score:.2f}\nSummary: {doc.page_content}"
             for doc, score in docs
         ])
 
-        # Simple CAG reuse
+        # Cheap CAG reuse
         fresh = Conversation.get_conversation(user, int(conv_id))
         msgs = fresh.get("messages", [])
         if (len(msgs) >= 2 and
@@ -106,10 +121,18 @@ class HomeController:
             )
             assistant_reply = ai.choices[0].message.content
 
+        # Save assistant msg
         Conversation.add_message(user, int(conv_id), "assistant", assistant_reply)
-        from flask import redirect
-        return redirect(f"/home/open/{conv_id}")
 
+        # Return the whole updated message list for convenience
+        updated = Conversation.get_conversation(user, int(conv_id))
+        return jsonify({
+            "assistant_reply": assistant_reply,
+            "messages": updated.get("messages", []),
+            "id": updated["id"],
+            "title": updated["title"]
+        })
+    
     # POST /home/delete/<id>  → delete conversation
     def delete(self, conv_id: int):
         from flask import redirect
