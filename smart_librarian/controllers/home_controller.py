@@ -102,8 +102,8 @@ class HomeController:
         ])
 
         # Cheap CAG reuse
-        fresh = Conversation.get_conversation(user, int(conv_id))
-        msgs = fresh.get("messages", [])
+        context_text = Conversation.get_conversation(user, int(conv_id))
+        msgs = context_text.get("messages", [])
         if (len(msgs) >= 2 and
             msgs[-2].get("role") == "user" and
             msgs[-2].get("content") == user_msg and
@@ -111,7 +111,7 @@ class HomeController:
             assistant_reply = msgs[-1].get("content", "")
         else:
             messages = [
-                {"role": "system", "content": "You are a friendly book recommendation assistant. Prefer titles from the provided context. Be warm and concise."},
+                {"role": "system", "content": "You are a friendly book recommendation assistant. Prefer titles from the provided context. Be warm and concise.If you don't know the answer, say 'I don't know' and ask for more details. If you are asked about informations not related to books, use a funny politely decline(like telling a joke about it)."},
                 {"role": "system", "content": f"Candidate books:\n{context_text}"},
                 {"role": "user", "content": user_msg},
             ]
