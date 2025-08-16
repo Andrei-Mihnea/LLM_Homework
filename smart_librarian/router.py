@@ -1,4 +1,4 @@
-# === router.py ===
+# smart_librarian/router.py
 import importlib.util
 import os
 import sys
@@ -8,11 +8,20 @@ class Router:
         self.default_controller = "home"
         self.default_action = "index"
 
-    def route(self, path):
-        parts = path.strip("/").split("/")
-        controller_name = parts[0] if parts[0] else self.default_controller
-        action_name = parts[1] if len(parts) > 1 else self.default_action
-        params = parts[2:] if len(parts) > 2 else []
+    def route(self, path: str):
+        parts = [p for p in path.strip("/").split("/") if p]
+
+        controller_name = parts[0] if parts else self.default_controller
+
+        # Map /<controller>/api/<action>[/<params...>] --> <action>(*params)
+        if len(parts) >= 2 and parts[1] == "api":
+            if len(parts) < 3:
+                return f"Error: API action missing for '{controller_name}'", 404
+            action_name = parts[2]         # e.g. "send", "messages"
+            params = parts[3:]             # optional params (e.g. conv_id)
+        else:
+            action_name = parts[1] if len(parts) > 1 else self.default_action
+            params = parts[2:] if len(parts) > 2 else []
 
         controller_file = f"smart_librarian/controllers/{controller_name}_controller.py"
         class_name = f"{controller_name.capitalize()}Controller"

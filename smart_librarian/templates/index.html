@@ -1,212 +1,292 @@
 <!-- templates/index.html -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8"/>
   <title>Smart Librarian</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
+
   <style>
+    /* ===== Scrollbar (theme-matched) ===== */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--panel); border-radius: 8px; border: 2px solid var(--bg); }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent1); }
+    * { scrollbar-width: thin; scrollbar-color: var(--panel) var(--bg); }
+
     :root{
-      --bg:#0b0d10; --panel:#11151b; --muted:#7d8896; --text:#e8edf2; --border:rgba(255,255,255,.06);
-      --accent1:#7c99ff; --accent2:#6c86ff; --accent3:#5ae3b3;
+      --bg:#0b0d10; --panel:#11151b; --muted:#8a95a3; --text:#e8edf2; --border:rgba(255,255,255,.08);
+      --accent1:#7c99ff; --accent2:#6c86ff; --accent3:#52e6b9; --danger:#ff7b94;
     }
+
     *{box-sizing:border-box}
-    body{
-      margin:0;background:var(--bg);color:var(--text);
-      font-family:system-ui,Segoe UI,Inter,Arial;
-      height:100vh;display:grid;grid-template-columns:280px 1fr;
+    html,body{height:100%}
+    body{ margin:0; background:var(--bg); color:var(--text); font-family:system-ui,Segoe UI,Inter,Arial; }
+
+    /* ===== Layout ===== */
+    .layout{ height:100vh; display:grid; grid-template-columns:300px 1fr; }
+    @media (max-width: 900px){ .layout{ grid-template-columns:1fr } }
+
+    /* ===== Sidebar ===== */
+    .side{
+      border-right:1px solid var(--border);
+      background:#0f1216;
+      display:flex; flex-direction:column; min-height:0;
+    }
+    .side .top{
+      position:sticky; top:0; z-index:5;
+      background:#0f1216;
+      padding:12px; border-bottom:1px solid var(--border);
+      display:flex; justify-content:space-between; align-items:center; gap:8px;
+    }
+    .hamburger{ display:none; border:1px solid var(--border); background:#121720; color:var(--text); border-radius:8px; padding:8px 10px; cursor:pointer; }
+    @media (max-width: 900px){
+      .side{ position:fixed; inset:0 30% 0 0; max-width:380px; transform:translateX(-100%); transition:transform .25s ease; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+      .side.open{ transform:translateX(0) }
+      .backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:none }
+      .backdrop.show{ display:block }
+      .hamburger{ display:inline-block }
     }
 
-    .side{border-right:1px solid var(--border);background:#0f1216;height:100vh;display:flex;flex-direction:column}
-    .side .top{padding:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
-    .btn{display:inline-block;padding:8px 10px;background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#0b0d10;border-radius:10px;text-decoration:none;font-weight:700}
-    .list{padding:10px;display:flex;flex-direction:column;gap:8px;overflow:auto}
-    .row{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px}
-    .row a{color:var(--accent3);text-decoration:none}
-    .row small{color:var(--muted);display:block;margin-top:4px}
-    .row form{margin-top:8px}
-    .danger{padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:#190e11;color:#ffb3c0;cursor:pointer}
+    .btn{
+      display:inline-block; padding:8px 10px;
+      background:linear-gradient(135deg,var(--accent1),var(--accent2));
+      color:#0b0d10; border-radius:10px; text-decoration:none; font-weight:700; white-space:nowrap;
+    }
+    .list{ padding:10px; display:flex; flex-direction:column; gap:10px; overflow:auto; min-height:0; }
+    .row{ background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:10px; }
+    .row a{ color:var(--accent3); text-decoration:none }
+    .row small{ color:var(--muted); display:block; margin-top:4px }
+    .row form{ margin-top:8px }
+    .danger{ padding:6px 8px; border-radius:8px; border:1px solid var(--border); background:#2a1216; color:var(--danger); cursor:pointer }
 
-    .main{height:100vh;display:flex;flex-direction:column}
-    .bar{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:#0f1216}
-    .area{flex:1;display:flex;justify-content:center}
-    .inner{width:min(900px,100%);padding:16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
-    .bubble{max-width:75%;padding:10px 12px;border-radius:14px;border:1px solid var(--border);line-height:1.5;white-space:pre-wrap}
-    .user{align-self:flex-end;background:#0e1116}
-    .assistant{align-self:flex-start;background:#141a23}
-    .meta{font-size:12px;color:var(--muted);margin:4px 2px}
+    /* ===== Main / Chat ===== */
+    .main{ display:flex; flex-direction:column; min-height:0 }
+    .bar{
+      position:sticky; top:0; z-index:5;
+      padding:10px 14px; border-bottom:1px solid var(--border);
+      display:flex; justify-content:space-between; align-items:center; background:#0f1216;
+    }
+    .nav-links{ display:flex; gap:12px; align-items:center }
+    .logout-btn{ padding:6px 10px; border-radius:8px; background:#2a1216; color:#ffb3c0; text-decoration:none; font-weight:600; border:1px solid var(--border) }
 
-    .composer{padding:10px;border-top:1px solid var(--border);background:#10141a}
-    form.chat{display:flex;gap:8px;align-items:flex-start}
-    .field{flex:1;display:flex;flex-direction:column;gap:8px}
-    .field label{font-size:12px;color:var(--muted)}
-    input[type="text"]{flex:1;background:#0e1116;border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px}
-    .actions{display:flex;gap:8px}
-    button.send{padding:10px 12px;border-radius:10px;border:0;background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#0b0d10;font-weight:800;cursor:pointer}
+    .area{ flex:1; min-height:0; position:relative; background:#0d1015 }
+    .inner{
+      position:absolute; inset:0 0 64px 0; /* space for composer */
+      overflow:auto; padding:16px;
+      display:flex; flex-direction:column; gap:12px;
+    }
 
-    .empty{opacity:.7;color:var(--muted);padding:24px;text-align:center}
+    /* === message rows (fixes full-width pills) === */
+    .msg{ display:flex; flex-direction:column; gap:6px; }
+    .msg.user{ align-items:flex-end; }
+    .msg.assistant{ align-items:flex-start; }
 
-    .nav-links{display:flex;gap:12px;align-items:center}
-    .logout-btn{padding:6px 10px;border-radius:8px;background:#190e11;color:#ffb3c0;text-decoration:none;font-weight:600;border:1px solid var(--border)}
+    .meta{ font-size:12px; color:var(--muted); margin:0 6px; }
+
+    .bubble{
+      display:inline-block;               /* shrink to content */
+      width:fit-content;                  /* key: no stretching */
+      max-width:min(680px, 85%);          /* wrap long text */
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      line-height:1.5;
+      white-space:pre-wrap;
+      overflow-wrap:anywhere;
+      background:#141a23;                 /* assistant default */
+    }
+    .msg.user .bubble{ background:#0e1116; }
+
+    .jump{
+      position:absolute; right:16px; bottom:80px; display:none;
+      padding:8px 10px; border-radius:10px; border:1px solid var(--border);
+      background:#111723; color:var(--text); cursor:pointer;
+      box-shadow:0 8px 20px rgba(0,0,0,.35);
+    }
+
+    /* Composer */
+    .composer{ position:sticky; bottom:0; z-index:4; padding:10px; border-top:1px solid var(--border); background:#10141a; }
+    form.chat{ display:flex; gap:8px; align-items:flex-end; max-width:1200px; margin:0 auto }
+    .field{ flex:1; display:flex; flex-direction:column; gap:6px }
+    .field label{ font-size:12px; color:var(--muted) }
+    input[type="text"]{ flex:1; background:#0e1116; border:1px solid var(--border); border-radius:10px; color:var(--text); padding:12px }
+    .actions{ display:flex; gap:8px }
+    button.send{
+      padding:12px 14px; border-radius:10px; border:0;
+      background:linear-gradient(135deg,var(--accent1),var(--accent2));
+      color:#0b0d10; font-weight:800; cursor:pointer; white-space:nowrap;
+    }
+
+    .empty{ opacity:.7; color:var(--muted); padding:24px; text-align:center }
   </style>
 </head>
 <body>
-  <!-- Sidebar -->
-  <aside class="side">
-    <div class="top">
-      <strong>Chats</strong>
-      <a class="btn" href="/home/new">+ New</a>
-    </div>
-    <div class="list">
-      {% if conversations %}
-        {% for c in conversations %}
-          <div class="row">
-            <a href="/home/open/{{ c.id }}">{{ c.title }}</a>
-            <small>Updated {{ c.updated_at }}</small>
-            <form action="/home/delete/{{ c.id }}" method="POST">
-              <button class="danger" type="submit">Delete</button>
-            </form>
-          </div>
-        {% endfor %}
-      {% else %}
-        <div class="row">No conversations yet.</div>
-      {% endif %}
-    </div>
-  </aside>
+  <!-- mobile overlay -->
+  <div class="backdrop" id="backdrop"></div>
 
-  <!-- Main chat -->
-  <main class="main">
-    <div class="bar">
-      <div>
-        {% if current %}
-          <span style="color:#9fb3c8">#{{ current.id }}</span>
-          <span style="margin-left:6px">{{ current.title }}</span>
-        {% else %}
-          <span style="color:#9fb3c8">No chat selected</span>
-        {% endif %}
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="side" id="sidebar">
+      <div class="top">
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="hamburger" id="closeSide">☰</button>
+          <strong>Chats</strong>
+        </div>
+        <a class="btn" href="/home/new">+ New</a>
       </div>
-      <div class="nav-links">
-        <a style="color:var(--accent3);text-decoration:none" href="/home/index">Home</a>
-        <a class="logout-btn" href="/auth/logout">Logout</a>
-      </div>
-    </div>
 
-    <div class="area">
-      <div class="inner" id="scroll">
-        {% if current and current.messages %}
-          {% for m in current.messages %}
-            <div class="meta">{{ loop.index }} · {{ m.role }}</div>
-            <div class="bubble {% if m.role == 'user' %}user{% else %}assistant{% endif %}">{{ m.content }}</div>
+      <div class="list">
+        {% if conversations %}
+          {% for c in conversations %}
+            <div class="row">
+              <a href="/home/open/{{ c.id }}">{{ c.title }}</a>
+              <small>Updated {{ c.updated_at }}</small>
+              <form action="/home/delete/{{ c.id }}" method="POST">
+                <button class="danger" type="submit">Delete</button>
+              </form>
+            </div>
           {% endfor %}
         {% else %}
-          <div class="empty">Start a new chat or select one from the left.</div>
+          <div class="row">No conversations yet.</div>
         {% endif %}
       </div>
-    </div>
+    </aside>
 
-    <div class="composer">
-      {% if current %}
-        <!-- data-conv-id instead of action -->
-        <form class="chat" data-conv-id="{{ current.id }}" method="POST" autocomplete="off">
-          <div class="field" style="max-width:720px">
-            <label for="message">Your message</label>
-            <input id="message" type="text" name="message" placeholder="Ask for cozy fantasy with found family..." required />
+    <!-- Main chat -->
+    <main class="main">
+      <div class="bar">
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="hamburger" id="openSide">☰</button>
+          {% if current %}
+            <span style="color:#9fb3c8">#{{ current.id }}</span>
+            <span style="margin-left:6px">{{ current.title }}</span>
+          {% else %}
+            <span style="color:#9fb3c8">No chat selected</span>
+          {% endif %}
+        </div>
+        <div class="nav-links">
+          <a style="color:var(--accent3);text-decoration:none" href="/home/index">Home</a>
+          <a class="logout-btn" href="/auth/logout">Logout</a>
+        </div>
+      </div>
+
+      <div class="area">
+        <div class="inner" id="messages">
+          {% if current and current.messages %}
+            {% for m in current.messages %}
+              <div class="msg {% if m.role == 'user' %}user{% else %}assistant{% endif %}">
+                <div class="meta">{{ m.role }}</div>
+                <div class="bubble">{{ m.content }}</div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty">Start a new chat or select one from the left.</div>
+          {% endif %}
+        </div>
+        <button class="jump" id="jump">Jump to latest ↓</button>
+      </div>
+
+      <div class="composer">
+        {% if current %}
+          <form class="chat" id="chatForm" autocomplete="off">
+            <div class="field" style="max-width:900px">
+              <label for="message">Your message</label>
+              <input id="message" type="text" name="message" placeholder="Ask for cozy fantasy with found family..." required />
+            </div>
+            <div class="actions">
+              <button class="send" type="submit">Send</button>
+            </div>
+          </form>
+        {% else %}
+          <div style="padding:8px 16px">
+            <a class="btn" href="/home/new">Create your first chat</a>
           </div>
-          <div class="actions">
-            <button class="send" type="submit">Send</button>
-          </div>
-        </form>
-      {% else %}
-        <a class="btn" href="/home/new">Create your first chat</a>
-      {% endif %}
-    </div>
-  </main>
+        {% endif %}
+      </div>
+    </main>
+  </div>
 
   <script>
-    const sc = document.getElementById('scroll');
-    function autoscroll(){ if (sc) sc.scrollTop = sc.scrollHeight; }
-    autoscroll();
+    // ----- Sidebar toggle (mobile) -----
+    const sidebar = document.getElementById('sidebar');
+    const openSide = document.getElementById('openSide');
+    const closeSide = document.getElementById('closeSide');
+    const backdrop = document.getElementById('backdrop');
 
-    const form = document.querySelector('form.chat');
-    const input = document.getElementById('message');
+    function toggleSide(open){
+      if (!sidebar) return;
+      if (open) { sidebar.classList.add('open'); backdrop && backdrop.classList.add('show'); }
+      else { sidebar.classList.remove('open'); backdrop && backdrop.classList.remove('show'); }
+    }
+    openSide && openSide.addEventListener('click', () => toggleSide(true));
+    closeSide && closeSide.addEventListener('click', () => toggleSide(false));
+    backdrop && backdrop.addEventListener('click', () => toggleSide(false));
 
-    function bubble(role, content, index){
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      meta.textContent = `${index} · ${role}`;
-      const div = document.createElement('div');
-      div.className = 'bubble ' + (role === 'user' ? 'user' : 'assistant');
-      div.textContent = content;
-      return [meta, div];
+    // ----- Message scrolling helpers -----
+    const msgBox = document.getElementById('messages');
+    const jumpBtn = document.getElementById('jump');
+
+    function atBottom(el){ return !el || (el.scrollHeight - el.scrollTop - el.clientHeight) < 20; }
+    function scrollToBottom(el){ if (el) el.scrollTop = el.scrollHeight; }
+
+    if (msgBox) scrollToBottom(msgBox);
+
+    if (msgBox && jumpBtn){
+      msgBox.addEventListener('scroll', () => {
+        jumpBtn.style.display = atBottom(msgBox) ? 'none' : 'block';
+      });
+      jumpBtn.addEventListener('click', () => scrollToBottom(msgBox));
     }
 
-    function toast(msg){
-      console.warn(msg);
-      const t = document.createElement('div');
-      t.style.position='fixed'; t.style.bottom='16px'; t.style.left='16px';
-      t.style.padding='10px 14px'; t.style.background='#2b1d1f';
-      t.style.color='#ffb3c0'; t.style.border='1px solid rgba(255,255,255,.08)';
-      t.style.borderRadius='10px'; t.textContent = msg;
-      document.body.appendChild(t);
-      setTimeout(()=>t.remove(), 2000);
-    }
+    // ----- Send via fetch → /home/send (matches HomeController.send) -----
+    {% if current %}
+    const form = document.getElementById('chatForm');
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = document.getElementById('message');
+      const text = (input.value || '').trim();
+      if (!text) return;
 
-    if (form && input){
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+      // optimistic user bubble
+      const userWrap = document.createElement('div');
+      userWrap.className = 'msg user';
+      userWrap.innerHTML = `<div class="meta">you</div><div class="bubble"></div>`;
+      userWrap.querySelector('.bubble').textContent = text;
+      msgBox.appendChild(userWrap);
+      scrollToBottom(msgBox);
+      input.value = '';
 
-        const text = (input.value || '').trim();
-        if (!text) return;
+      try {
+        const res = await fetch(`/home/send`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ message: text })
+        });
 
-        const inner = document.querySelector('.inner');
-        const convId = form.dataset.convId;
+        const isJSON = (res.headers.get('content-type') || '').includes('application/json');
+        if (!res.ok || !isJSON) throw new Error('Send failed');
 
-        // optimistic bubble
-        const idx = inner.querySelectorAll('.bubble').length + 1;
-        const [mu, bu] = bubble('user', text, idx);
-        inner.appendChild(mu); inner.appendChild(bu);
-        autoscroll();
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
 
-        input.value = '';
-        input.disabled = true;
-
-        try {
-          const res = await fetch(`/home/send/${encodeURIComponent(convId)}`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ message: text })
-          });
-          
-          const raw = await res.text();
-          let data = null;
-          try {
-            data = JSON.parse(raw);
-          } catch {
-            console.error('Non-JSON response:', raw);
-            toast('Send failed (non-JSON response)');
-            return;
-          }
-
-          if (!res.ok || data.error) {
-            toast(data.error || `Send failed (${res.status})`);
-            return;
-          }
-
-          // assistant bubble
-          const idx2 = inner.querySelectorAll('.bubble').length + 1;
-          const [ma, ba] = bubble('assistant', data.assistant_reply, idx2);
-          inner.appendChild(ma); inner.appendChild(ba);
-          autoscroll();
-        } catch (err){
-          console.error(err);
-          toast('Network error');
-        } finally {
-          input.disabled = false;
-          input.focus();
+        if (data.assistant_reply) {
+          const aWrap = document.createElement('div');
+          aWrap.className = 'msg assistant';
+          aWrap.innerHTML = `<div class="meta">assistant</div><div class="bubble"></div>`;
+          aWrap.querySelector('.bubble').textContent = data.assistant_reply;
+          msgBox.appendChild(aWrap);
+          scrollToBottom(msgBox);
         }
-      }, { passive:false });
-    }
+      } catch (err){
+        const errDiv = document.createElement('div');
+        errDiv.className = 'msg assistant';
+        errDiv.innerHTML = `<div class="meta">assistant</div><div class="bubble" style="border-color:rgba(255,0,0,.3)">Failed to send. Please try again.</div>`;
+        msgBox.appendChild(errDiv);
+        scrollToBottom(msgBox);
+      }
+    });
+    {% endif %}
   </script>
 </body>
 </html>
