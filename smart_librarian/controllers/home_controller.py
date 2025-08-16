@@ -124,7 +124,8 @@ class HomeController:
                             "Always use the ongoing conversation to stay consistent. "
                             "If the user asks about 'earlier' or 'previous', refer to the chat history you received if none is given in a respectfully manner say you didn't discuss about anything yet. "
                             "Prefer recommending from the provided candidate books when relevant. "
-                            "If the question is not about books, politely steer back to reading topics.")
+                            "If the question is not about books, politely steer back to reading topics."
+                            "Its mandatory that the books you are recommending are found in the books you are given initially in the RAG if the book is not inside the RAG decline respectfully that you don't have informations about it and ask for other recommendations")
 
             ai = client.chat.completions.create(
                 model="gpt-3.5-turbo",
