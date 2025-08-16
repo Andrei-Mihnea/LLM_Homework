@@ -5,120 +5,103 @@
   <meta charset="utf-8"/>
   <title>Smart Librarian</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-
   <style>
-    /* ===== Scrollbar (theme-matched) ===== */
-    ::-webkit-scrollbar { width: 10px; height: 10px; }
-    ::-webkit-scrollbar-track { background: var(--bg); }
-    ::-webkit-scrollbar-thumb { background: var(--panel); border-radius: 8px; border: 2px solid var(--bg); }
-    ::-webkit-scrollbar-thumb:hover { background: var(--accent1); }
-    * { scrollbar-width: thin; scrollbar-color: var(--panel) var(--bg); }
+    /* ====== Scrollbar Styling ====== */
+    ::-webkit-scrollbar{width:10px;height:10px}
+    ::-webkit-scrollbar-track{background:var(--bg)}
+    ::-webkit-scrollbar-thumb{background:var(--panel);border-radius:8px;border:2px solid var(--bg)}
+    ::-webkit-scrollbar-thumb:hover{background:var(--accent1)}
+    *{scrollbar-width:thin;scrollbar-color:var(--panel) var(--bg)}
 
     :root{
-      --bg:#0b0d10; --panel:#11151b; --muted:#8a95a3; --text:#e8edf2; --border:rgba(255,255,255,.08);
-      --accent1:#7c99ff; --accent2:#6c86ff; --accent3:#52e6b9; --danger:#ff7b94;
+      --bg:#0b0d10; --panel:#11151b; --muted:#8a95a3; --text:#e8edf2;
+      --border:rgba(255,255,255,.08); --accent1:#7c99ff; --accent2:#6c86ff;
+      --accent3:#52e6b9; --danger:#ff7b94;
     }
-
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{ margin:0; background:var(--bg); color:var(--text); font-family:system-ui,Segoe UI,Inter,Arial; }
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,Segoe UI,Inter,Arial}
 
-    /* ===== Layout ===== */
-    .layout{ height:100vh; display:grid; grid-template-columns:300px 1fr; }
-    @media (max-width: 900px){ .layout{ grid-template-columns:1fr } }
+    /* ====== Layout ====== */
+    .layout{height:100vh;display:grid;grid-template-columns:300px 1fr}
+    @media (max-width:900px){.layout{grid-template-columns:1fr}}
 
-    /* ===== Sidebar ===== */
-    .side{
-      border-right:1px solid var(--border);
-      background:#0f1216;
-      display:flex; flex-direction:column; min-height:0;
-    }
-    .side .top{
-      position:sticky; top:0; z-index:5;
-      background:#0f1216;
-      padding:12px; border-bottom:1px solid var(--border);
-      display:flex; justify-content:space-between; align-items:center; gap:8px;
-    }
-    .hamburger{ display:none; border:1px solid var(--border); background:#121720; color:var(--text); border-radius:8px; padding:8px 10px; cursor:pointer; }
-    @media (max-width: 900px){
-      .side{ position:fixed; inset:0 30% 0 0; max-width:380px; transform:translateX(-100%); transition:transform .25s ease; box-shadow:0 20px 60px rgba(0,0,0,.5); }
-      .side.open{ transform:translateX(0) }
-      .backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:none }
-      .backdrop.show{ display:block }
-      .hamburger{ display:inline-block }
+    /* ====== Sidebar ====== */
+    .side{border-right:1px solid var(--border);background:#0f1216;display:flex;flex-direction:column;min-height:0}
+    .side .top{position:sticky;top:0;z-index:5;background:#0f1216;padding:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .hamburger{display:none;border:1px solid var(--border);background:#121720;color:var(--text);border-radius:8px;padding:8px 10px;cursor:pointer}
+    @media (max-width:900px){
+      .side{position:fixed;inset:0 30% 0 0;max-width:380px;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+      .side.open{transform:translateX(0)}
+      .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none}
+      .backdrop.show{display:block}
+      .hamburger{display:inline-block}
     }
 
-    .btn{
-      display:inline-block; padding:8px 10px;
-      background:linear-gradient(135deg,var(--accent1),var(--accent2));
-      color:#0b0d10; border-radius:10px; text-decoration:none; font-weight:700; white-space:nowrap;
-    }
-    .list{ padding:10px; display:flex; flex-direction:column; gap:10px; overflow:auto; min-height:0; }
-    .row{ background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:10px; }
-    .row a{ color:var(--accent3); text-decoration:none }
-    .row small{ color:var(--muted); display:block; margin-top:4px }
-    .row form{ margin-top:8px }
-    .danger{ padding:6px 8px; border-radius:8px; border:1px solid var(--border); background:#2a1216; color:var(--danger); cursor:pointer }
+    .btn{display:inline-block;padding:8px 10px;background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#0b0d10;border-radius:10px;text-decoration:none;font-weight:700;white-space:nowrap}
+    .list{padding:10px;display:flex;flex-direction:column;gap:10px;overflow:auto;min-height:0}
+    .row{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px}
+    .row a{color:var(--accent3);text-decoration:none}
+    .row small{color:var(--muted);display:block;margin-top:4px}
+    .row form{margin-top:8px}
+    .danger{padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:#2a1216;color:var(--danger);cursor:pointer}
 
-    /* ===== Main / Chat ===== */
-    .main{ display:flex; flex-direction:column; min-height:0 }
-    .bar{
-      position:sticky; top:0; z-index:5;
-      padding:10px 14px; border-bottom:1px solid var(--border);
-      display:flex; justify-content:space-between; align-items:center; background:#0f1216;
-    }
-    .nav-links{ display:flex; gap:12px; align-items:center }
-    .logout-btn{ padding:6px 10px; border-radius:8px; background:#2a1216; color:#ffb3c0; text-decoration:none; font-weight:600; border:1px solid var(--border) }
+    /* ====== Main / Chat ====== */
+    .main{display:flex;flex-direction:column;min-height:0}
+    .bar{position:sticky;top:0;z-index:5;padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:#0f1216}
+    .nav-links{display:flex;gap:12px;align-items:center}
+    .logout-btn{padding:6px 10px;border-radius:8px;background:#2a1216;color:#ffb3c0;text-decoration:none;font-weight:600;border:1px solid var(--border)}
 
-    .area{ flex:1; min-height:0; position:relative; background:#0d1015 }
-    .inner{
-      position:absolute; inset:0 0 64px 0; /* space for composer */
-      overflow:auto; padding:16px;
-      display:flex; flex-direction:column; gap:12px;
-    }
+    .area{flex:1;min-height:0;position:relative;background:#0d1015}
+    .inner{position:absolute;inset:0 0 64px 0;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
 
-    /* === message rows (fixes full-width pills) === */
-    .msg{ display:flex; flex-direction:column; gap:6px; }
-    .msg.user{ align-items:flex-end; }
-    .msg.assistant{ align-items:flex-start; }
+    .bubble{max-width:min(75%,820px);padding:10px 12px;border-radius:14px;border:1px solid var(--border);line-height:1.5;white-space:pre-wrap;word-wrap:break-word}
+    .user{align-self:flex-end;background:#0e1116}
+    .assistant{align-self:flex-start;background:#141a23}
+    .meta{font-size:12px;color:var(--muted);margin:4px 2px}
 
-    .meta{ font-size:12px; color:var(--muted); margin:0 6px; }
-
-    .bubble{
-      display:inline-block;               /* shrink to content */
-      width:fit-content;                  /* key: no stretching */
-      max-width:min(680px, 85%);          /* wrap long text */
-      padding:10px 12px;
-      border-radius:14px;
-      border:1px solid var(--border);
-      line-height:1.5;
-      white-space:pre-wrap;
-      overflow-wrap:anywhere;
-      background:#141a23;                 /* assistant default */
-    }
-    .msg.user .bubble{ background:#0e1116; }
-
-    .jump{
-      position:absolute; right:16px; bottom:80px; display:none;
-      padding:8px 10px; border-radius:10px; border:1px solid var(--border);
-      background:#111723; color:var(--text); cursor:pointer;
-      box-shadow:0 8px 20px rgba(0,0,0,.35);
-    }
+    .jump{position:absolute;right:16px;bottom:80px;display:none;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:#111723;color:var(--text);cursor:pointer;box-shadow:0 8px 20px rgba(0,0,0,.35)}
 
     /* Composer */
-    .composer{ position:sticky; bottom:0; z-index:4; padding:10px; border-top:1px solid var(--border); background:#10141a; }
-    form.chat{ display:flex; gap:8px; align-items:flex-end; max-width:1200px; margin:0 auto }
-    .field{ flex:1; display:flex; flex-direction:column; gap:6px }
-    .field label{ font-size:12px; color:var(--muted) }
-    input[type="text"]{ flex:1; background:#0e1116; border:1px solid var(--border); border-radius:10px; color:var(--text); padding:12px }
-    .actions{ display:flex; gap:8px }
-    button.send{
-      padding:12px 14px; border-radius:10px; border:0;
-      background:linear-gradient(135deg,var(--accent1),var(--accent2));
-      color:#0b0d10; font-weight:800; cursor:pointer; white-space:nowrap;
-    }
+    .composer{position:sticky;bottom:0;z-index:4;padding:10px;border-top:1px solid var(--border);background:#10141a}
+    form.chat{display:flex;gap:8px;align-items:flex-end;max-width:1200px;margin:0 auto}
+    .field{flex:1;display:flex;flex-direction:column;gap:6px}
+    .field label{font-size:12px;color:var(--muted)}
+    input[type="text"]{flex:1;background:#0e1116;border:1px solid var(--border);border-radius:10px;color:var(--text);padding:12px}
+    .actions{display:flex;gap:8px}
+    button.send{padding:12px 14px;border-radius:10px;border:0;background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#0b0d10;font-weight:800;cursor:pointer;white-space:nowrap}
 
-    .empty{ opacity:.7; color:var(--muted); padding:24px; text-align:center }
+    /* ====== Fancy empty state ====== */
+    .welcome{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px}
+    .welcome-card{
+      max-width:780px;width:100%;text-align:center;padding:36px 30px;border:1px solid var(--border);
+      border-radius:16px;background:linear-gradient(180deg,#0f1420 0%, #0d1015 100%);
+      box-shadow:0 0 22px rgba(124,153,255,.18);animation:glow 3s ease-in-out infinite alternate
+    }
+    @keyframes glow{
+      from{box-shadow:0 0 14px rgba(124,153,255,.12)}
+      to{box-shadow:0 0 28px rgba(124,153,255,.26)}
+    }
+    .sparkle{
+      width:52px;height:52px;margin:0 auto 10px;border-radius:14px;
+      background:radial-gradient(closest-side, var(--accent1), transparent 70%);
+      filter:blur(.6px);opacity:.9;animation:pulse 2.8s ease-in-out infinite
+    }
+    @keyframes pulse{0%{transform:scale(.9);opacity:.75}50%{transform:scale(1);opacity:1}100%{transform:scale(.9);opacity:.75}}
+    .headline{
+      font-size:28px;font-weight:800;margin:0;
+      background:linear-gradient(135deg,var(--accent1),var(--accent3));
+      -webkit-background-clip:text;background-clip:text;color:transparent
+    }
+    .tagline{margin:10px 0 16px;color:var(--muted)}
+    .chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+    .chip{
+      padding:10px 14px;border-radius:999px;border:1px solid var(--border);background:#121826;
+      color:var(--accent3);cursor:pointer;transition:transform .06s ease, background .15s ease, border-color .15s ease;
+      user-select:none
+    }
+    .chip:hover{transform:translateY(-1px);background:#162032;border-color:rgba(124,153,255,.35)}
+    .hint{margin-top:12px;font-size:12px;color:var(--muted)}
   </style>
 </head>
 <body>
@@ -173,19 +156,26 @@
 
       <div class="area">
         <div class="inner" id="messages">
-          {% if current and current.messages %}
-            {% for m in current.messages %}
-              <div class="msg {% if m.role == 'user' %}user{% else %}assistant{% endif %}">
-                <div class="meta">{{ m.role }}</div>
-                <div class="bubble">{{ m.content }}</div>
-              </div>
-            {% endfor %}
+          {% if current %}
+            {% if current.messages %}
+              {% for m in current.messages %}
+                <div class="meta">{{ loop.index }} · {{ m.role }}</div>
+                <div class="bubble {% if m.role == 'user' %}user{% else %}assistant{% endif %}">{{ m.content }}</div>
+              {% endfor %}
+            {% else %}
+              <div class="empty">No messages yet — say hi to start the conversation.</div>
+            {% endif %}
           {% else %}
-            <div class="empty">Start a new chat or select one from the left.</div>
+            <div class="welcome">
+              <div class="welcome-card">
+                <div class="sparkle"></div>
+                <h1 class="headline">Start a new chat or pick one from the left</h1>
+                <p class="tagline">Not sure what to ask? Ask anything and you will receive immediate indications</p>
+              </div>
+            </div>
           {% endif %}
         </div>
-        <button class="jump" id="jump">Jump to latest ↓</button>
-      </div>
+      </div>  <!-- ✅ CLOSE .area here -->
 
       <div class="composer">
         {% if current %}
@@ -198,48 +188,47 @@
               <button class="send" type="submit">Send</button>
             </div>
           </form>
-        {% else %}
-          <div style="padding:8px 16px">
-            <a class="btn" href="/home/new">Create your first chat</a>
-          </div>
         {% endif %}
       </div>
     </main>
   </div>
 
   <script>
-    // ----- Sidebar toggle (mobile) -----
+    // Sidebar toggle
     const sidebar = document.getElementById('sidebar');
     const openSide = document.getElementById('openSide');
     const closeSide = document.getElementById('closeSide');
     const backdrop = document.getElementById('backdrop');
-
     function toggleSide(open){
       if (!sidebar) return;
-      if (open) { sidebar.classList.add('open'); backdrop && backdrop.classList.add('show'); }
+      if (open){ sidebar.classList.add('open'); backdrop && backdrop.classList.add('show'); }
       else { sidebar.classList.remove('open'); backdrop && backdrop.classList.remove('show'); }
     }
     openSide && openSide.addEventListener('click', () => toggleSide(true));
     closeSide && closeSide.addEventListener('click', () => toggleSide(false));
     backdrop && backdrop.addEventListener('click', () => toggleSide(false));
 
-    // ----- Message scrolling helpers -----
+    // Message scroll helpers
     const msgBox = document.getElementById('messages');
-    const jumpBtn = document.getElementById('jump');
-
-    function atBottom(el){ return !el || (el.scrollHeight - el.scrollTop - el.clientHeight) < 20; }
     function scrollToBottom(el){ if (el) el.scrollTop = el.scrollHeight; }
-
     if (msgBox) scrollToBottom(msgBox);
 
-    if (msgBox && jumpBtn){
-      msgBox.addEventListener('scroll', () => {
-        jumpBtn.style.display = atBottom(msgBox) ? 'none' : 'block';
-      });
-      jumpBtn.addEventListener('click', () => scrollToBottom(msgBox));
+    // Prefill after “+ New”
+    function startWith(text){
+      localStorage.setItem('prefill_message', text);
+      window.location.href = '/home/new';
     }
+    (function prefill(){
+      const input = document.getElementById('message');
+      const pref = localStorage.getItem('prefill_message');
+      if (input && pref){
+        input.value = pref;
+        input.focus();
+        localStorage.removeItem('prefill_message');
+      }
+    })();
 
-    // ----- Send via fetch → /home/send (matches HomeController.send) -----
+    // Submit via fetch
     {% if current %}
     const form = document.getElementById('chatForm');
     form?.addEventListener('submit', async (e) => {
@@ -248,40 +237,36 @@
       const text = (input.value || '').trim();
       if (!text) return;
 
-      // optimistic user bubble
-      const userWrap = document.createElement('div');
-      userWrap.className = 'msg user';
-      userWrap.innerHTML = `<div class="meta">you</div><div class="bubble"></div>`;
-      userWrap.querySelector('.bubble').textContent = text;
-      msgBox.appendChild(userWrap);
+      const wrap = document.createElement('div');
+      wrap.innerHTML = `<div class="meta">you</div><div class="bubble user"></div>`;
+      wrap.querySelector('.bubble').textContent = text;
+      msgBox.appendChild(wrap);
       scrollToBottom(msgBox);
       input.value = '';
 
-      try {
-        const res = await fetch(`/home/send`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ message: text })
+      try{
+        const res = await fetch(`/home/api/send`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({message:text})
         });
-
         const isJSON = (res.headers.get('content-type') || '').includes('application/json');
         if (!res.ok || !isJSON) throw new Error('Send failed');
-
         const data = await res.json();
         if (data.error) throw new Error(data.error);
 
-        if (data.assistant_reply) {
-          const aWrap = document.createElement('div');
-          aWrap.className = 'msg assistant';
-          aWrap.innerHTML = `<div class="meta">assistant</div><div class="bubble"></div>`;
-          aWrap.querySelector('.bubble').textContent = data.assistant_reply;
-          msgBox.appendChild(aWrap);
+        if (data.assistant_reply){
+          const a = document.createElement('div');
+          a.innerHTML = `<div class="meta">assistant</div><div class="bubble assistant"></div>`;
+          a.querySelector('.bubble').textContent = data.assistant_reply;
+          msgBox.appendChild(a);
           scrollToBottom(msgBox);
         }
-      } catch (err){
+      }catch{
         const errDiv = document.createElement('div');
-        errDiv.className = 'msg assistant';
-        errDiv.innerHTML = `<div class="meta">assistant</div><div class="bubble" style="border-color:rgba(255,0,0,.3)">Failed to send. Please try again.</div>`;
+        errDiv.className = 'bubble assistant';
+        errDiv.style.borderColor = 'rgba(255,0,0,.3)';
+        errDiv.textContent = 'Failed to send. Please try again.';
         msgBox.appendChild(errDiv);
         scrollToBottom(msgBox);
       }
