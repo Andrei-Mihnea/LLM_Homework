@@ -40,7 +40,7 @@
     form.chat{display:flex;gap:8px;align-items:flex-start}
     .field{flex:1;display:flex;flex-direction:column;gap:8px}
     .field label{font-size:12px;color:var(--muted)}
-    input[type="text"]{flex:1;background:#0e1116;border:1px solid var(--border);border-radius:10px;color:#e8edf2;padding:10px}
+    input[type="text"]{flex:1;background:#0e1116;border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px}
     .actions{display:flex;gap:8px}
     button.send{padding:10px 12px;border-radius:10px;border:0;background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#0b0d10;font-weight:800;cursor:pointer}
 
@@ -106,7 +106,8 @@
 
     <div class="composer">
       {% if current %}
-        <form class="chat" action="/home/send/{{ current.id }}" method="POST" autocomplete="off">
+        <!-- data-conv-id instead of action -->
+        <form class="chat" data-conv-id="{{ current.id }}" method="POST" autocomplete="off">
           <div class="field" style="max-width:720px">
             <label for="message">Your message</label>
             <input id="message" type="text" name="message" placeholder="Ask for cozy fantasy with found family..." required />
@@ -133,51 +134,78 @@
       const meta = document.createElement('div');
       meta.className = 'meta';
       meta.textContent = `${index} · ${role}`;
-
       const div = document.createElement('div');
       div.className = 'bubble ' + (role === 'user' ? 'user' : 'assistant');
       div.textContent = content;
-
       return [meta, div];
+    }
+
+    function toast(msg){
+      console.warn(msg);
+      const t = document.createElement('div');
+      t.style.position='fixed'; t.style.bottom='16px'; t.style.left='16px';
+      t.style.padding='10px 14px'; t.style.background='#2b1d1f';
+      t.style.color='#ffb3c0'; t.style.border='1px solid rgba(255,255,255,.08)';
+      t.style.borderRadius='10px'; t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(()=>t.remove(), 2000);
     }
 
     if (form && input){
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        e.stopPropagation();
+
         const text = (input.value || '').trim();
         if (!text) return;
 
         const inner = document.querySelector('.inner');
-        const convId = form.getAttribute('action').split('/').pop();
+        const convId = form.dataset.convId;
 
-        // optimistic user bubble
+        // optimistic bubble
         const idx = inner.querySelectorAll('.bubble').length + 1;
         const [mu, bu] = bubble('user', text, idx);
         inner.appendChild(mu); inner.appendChild(bu);
         autoscroll();
+
         input.value = '';
         input.disabled = true;
 
         try {
-          const res = await fetch(`/home/api/send/${convId}`, {
+          const res = await fetch(`/home/send/${encodeURIComponent(convId)}`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ message: text })
           });
-          if (!res.ok) { window.location.reload(); return; }
-          const data = await res.json();
+          
+          const raw = await res.text();
+          let data = null;
+          try {
+            data = JSON.parse(raw);
+          } catch {
+            console.error('Non-JSON response:', raw);
+            toast('Send failed (non-JSON response)');
+            return;
+          }
 
-          const [ma, ba] = bubble('assistant', data.assistant_reply, idx + 1);
+          if (!res.ok || data.error) {
+            toast(data.error || `Send failed (${res.status})`);
+            return;
+          }
+
+          // assistant bubble
+          const idx2 = inner.querySelectorAll('.bubble').length + 1;
+          const [ma, ba] = bubble('assistant', data.assistant_reply, idx2);
           inner.appendChild(ma); inner.appendChild(ba);
           autoscroll();
         } catch (err){
           console.error(err);
-          window.location.reload();
+          toast('Network error');
         } finally {
           input.disabled = false;
           input.focus();
         }
-      });
+      }, { passive:false });
     }
   </script>
 </body>

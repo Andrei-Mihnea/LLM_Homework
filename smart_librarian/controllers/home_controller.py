@@ -78,6 +78,7 @@ class HomeController:
         data = request.get_json(silent=True) or {}
         user_msg = (data.get("message") or "").strip()
         if not user_msg:
+            print("Empty user message")
             return jsonify({"error": "empty_message"}), 400
 
         # Ensure conversation exists
