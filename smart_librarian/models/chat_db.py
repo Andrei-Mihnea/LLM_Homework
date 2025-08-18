@@ -41,7 +41,6 @@ def init_chat_db():
 
 class Conversation:
     """Convenience wrapper returning plain dicts for Jinja."""
-
     @staticmethod
     def list_conversations(username: str) -> List[Dict[str, Any]]:
         with SessionLocal() as s:
