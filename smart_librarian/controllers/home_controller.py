@@ -74,83 +74,83 @@ class HomeController:
         return redirect(f"/home/open/{cid}")
 
     # POST /home/send  (called via /home/api/send)
-    def send(self):
-        user = current_user()
-        if not user:
-            return jsonify({"error": "unauthorized"}), 401
+    # def send(self):
+    #     user = current_user()
+    #     if not user:
+    #         return jsonify({"error": "unauthorized"}), 401
 
-        data = request.get_json(silent=True) or {}
-        user_msg = (data.get("message") or "").strip()
-        if not user_msg:
-            return jsonify({"error": "empty_message"}), 400
+    #     data = request.get_json(silent=True) or {}
+    #     user_msg = (data.get("message") or "").strip()
+    #     if not user_msg:
+    #         return jsonify({"error": "empty_message"}), 400
 
-        # conv_id from body OR cookie
-        conv_id = data.get("conv_id") or request.cookies.get(COOKIE_CONV)
-        if not conv_id:
-            # no conv selected → create one
-            conv_id = Conversation.create_conversation(user, "New chat")
-        conv_id = int(conv_id)
+    #     # conv_id from body OR cookie
+    #     conv_id = data.get("conv_id") or request.cookies.get(COOKIE_CONV)
+    #     if not conv_id:
+    #         # no conv selected → create one
+    #         conv_id = Conversation.create_conversation(user, "New chat")
+    #     conv_id = int(conv_id)
 
-        conv = Conversation.get_conversation(user, conv_id)
-        if not conv:
-            # if somehow missing, create it
-            conv_id = Conversation.create_conversation(user, "New chat")
-            conv = Conversation.get_conversation(user, conv_id)
+    #     conv = Conversation.get_conversation(user, conv_id)
+    #     if not conv:
+    #         # if somehow missing, create it
+    #         conv_id = Conversation.create_conversation(user, "New chat")
+    #         conv = Conversation.get_conversation(user, conv_id)
 
-        # first message → set title
-        if not conv.get("messages"):
-            Conversation.set_title(user, conv_id, user_msg[:60])
+    #     # first message → set title
+    #     if not conv.get("messages"):
+    #         Conversation.set_title(user, conv_id, user_msg[:60])
 
-        # save user message
-        Conversation.add_message(user, conv_id, "user", user_msg)
+    #     # save user message
+    #     Conversation.add_message(user, conv_id, "user", user_msg)
 
-        # RAG: build context_text (don't overwrite it!)
-        docs = self.vectorstore.similarity_search_with_relevance_scores(user_msg, k=3)
-        context_text = "\n\n".join([
-            f"Title: {doc.metadata.get('title','Untitled')}\nRelevance: {score:.2f}\nSummary: {doc.page_content}"
-            for doc, score in docs
-        ])
+    #     # RAG: build context_text (don't overwrite it!)
+    #     docs = self.vectorstore.similarity_search_with_relevance_scores(user_msg, k=3)
+    #     context_text = "\n\n".join([
+    #         f"Title: {doc.metadata.get('title','Untitled')}\nRelevance: {score:.2f}\nSummary: {doc.page_content}"
+    #         for doc, score in docs
+    #     ])
 
-        # cheap CAG (reuse last if same)
-        fresh = Conversation.get_conversation(user, conv_id)
-        msgs = fresh.get("messages", [])
-        if (len(msgs) >= 2 and
-            msgs[-2].get("role") == "user" and
-            msgs[-2].get("content") == user_msg and
-            msgs[-1].get("role") == "assistant"):
-            assistant_reply = msgs[-1].get("content", "")
-        else:
-            system_prompt = ("You are a friendly book recommendation assistant. "
-                            "Always use the ongoing conversation to stay consistent. "
-                            "If the user asks about 'earlier' or 'previous', refer to the chat history you received if none is given in a respectfully manner say you didn't discuss about anything yet. "
-                            "Prefer recommending from the provided candidate books when relevant. "
-                            "If the question is not about books, politely steer back to reading topics."
-                            "Its mandatory that the books you are recommending are found in the books you are given initially in the RAG if the book is not inside the RAG decline respectfully that you don't have informations about it and ask for other recommendations")
+    #     # cheap CAG (reuse last if same)
+    #     fresh = Conversation.get_conversation(user, conv_id)
+    #     msgs = fresh.get("messages", [])
+    #     if (len(msgs) >= 2 and
+    #         msgs[-2].get("role") == "user" and
+    #         msgs[-2].get("content") == user_msg and
+    #         msgs[-1].get("role") == "assistant"):
+    #         assistant_reply = msgs[-1].get("content", "")
+    #     else:
+    #         system_prompt = ("You are a friendly book recommendation assistant. "
+    #                         "Always use the ongoing conversation to stay consistent. "
+    #                         "If the user asks about 'earlier' or 'previous', refer to the chat history you received if none is given in a respectfully manner say you didn't discuss about anything yet. "
+    #                         "Prefer recommending from the provided candidate books when relevant. "
+    #                         "If the question is not about books, politely steer back to reading topics."
+    #                         "Its mandatory that the books you are recommending are found in the books you are given initially in the RAG if the book is not inside the RAG decline respectfully that you don't have informations about it and ask for other recommendations")
 
-            ai = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content":system_prompt},
-                    {"role": "system", "content": f"Candidate books:\n{context_text}"},
-                    {"role": "user", "content": user_msg},
-                ],
-                temperature=0.6,
-            )
-            assistant_reply = ai.choices[0].message.content
+    #         ai = client.chat.completions.create(
+    #             model="gpt-3.5-turbo",
+    #             messages=[
+    #                 {"role": "system", "content":system_prompt},
+    #                 {"role": "system", "content": f"Candidate books:\n{context_text}"},
+    #                 {"role": "user", "content": user_msg},
+    #             ],
+    #             temperature=0.6,
+    #         )
+    #         assistant_reply = ai.choices[0].message.content
 
-        Conversation.add_message(user, conv_id, "assistant", assistant_reply)
+    #     Conversation.add_message(user, conv_id, "assistant", assistant_reply)
 
-        # respond with updated state + set cookie so FE doesn't lose selection
-        updated = Conversation.get_conversation(user, conv_id)
-        resp = jsonify({
-            "ok": True,
-            "conv_id": conv_id,
-            "assistant_reply": assistant_reply,
-            "messages": updated.get("messages", []),
-            "title": updated.get("title")
-        })
-        resp.set_cookie(COOKIE_CONV, str(conv_id), httponly=True, samesite="Strict")
-        return resp
+    #     # respond with updated state + set cookie so FE doesn't lose selection
+    #     updated = Conversation.get_conversation(user, conv_id)
+    #     resp = jsonify({
+    #         "ok": True,
+    #         "conv_id": conv_id,
+    #         "assistant_reply": assistant_reply,
+    #         "messages": updated.get("messages", []),
+    #         "title": updated.get("title")
+    #     })
+    #     resp.set_cookie(COOKIE_CONV, str(conv_id), httponly=True, samesite="Strict")
+    #     return resp
 
     # POST /home/delete/<id>
     def delete(self, conv_id: int):
