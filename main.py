@@ -5,6 +5,7 @@ from smart_librarian.router import Router
 from flask import request
 from smart_librarian.models.user_db import init_db
 from smart_librarian.models.chat_db import init_chat_db
+
 app = create_app()
 router = Router()
 init_db()

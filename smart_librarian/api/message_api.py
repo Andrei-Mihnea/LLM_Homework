@@ -2,13 +2,15 @@
 from flask import Blueprint, request, jsonify
 from smart_librarian.utils.auth_guard import current_user
 from smart_librarian.models.chat_db import Conversation
-from smart_librarian.models.book_model import load_summaries, build_vectorstore
 from openai import OpenAI
 import os
-
+from smart_librarian.models.book_model import BookModel
 api_bp = Blueprint("api", __name__, url_prefix="/api")
+
 COOKIE_CONV = "current_conv_id"
-_VECTORSTORE = build_vectorstore(load_summaries())
+
+VECTORSTORE = BookModel()
+
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def _require_user():
@@ -74,28 +76,33 @@ def api_send():
     conv_id = data.get("conv_id") or request.cookies.get(COOKIE_CONV) or Conversation.create_conversation(user, "New chat")
     conv_id = int(conv_id)
     conv = Conversation.get_conversation(user, conv_id) or Conversation.get_conversation(user, Conversation.create_conversation(user, "New chat"))
-
     if not conv.get("messages"): Conversation.set_title(user, conv_id, user_msg[:60])
     Conversation.add_message(user, conv_id, "user", user_msg)
 
-    docs = _VECTORSTORE.similarity_search_with_relevance_scores(user_msg, k=3)
+    docs = VECTORSTORE.similarity_search_with_relevance_scores(user_msg, k=3)
     context_text = "\n\n".join(
         f"Title: {d.metadata.get('title','Untitled')}\nRelevance: {score:.2f}\nSummary: {d.page_content}"
         for d, score in docs
     )
-    system_prompt = ("You are a friendly book recommendation assistant. "
-                     "Use the conversation history to stay consistent. "
-                     "Prefer candidates I give you; if a requested book isn't in them, say so politely and suggest nearby options.")
+    print(context_text)
+    msgs = conv.get("messages", [])
+    system_prompt = (
+                    "You are a friendly book recommendation assistant.\n"
+                    "HARD RULES:\n"
+                    "- Recommend ONLY from the CANDIDATES list (by id).\n"
+                    "- If nothing fits, ask 1–2 clarifying questions instead of inventing titles.\n"
+                    "CANDIDATES are provided via tool schema.\n"
+                    )
     ai = client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4o-mini",
         messages=[
-            {"role":"system","content":system_prompt},
-            {"role":"system","content":f"Candidate books:\n{context_text}"},
-            {"role":"user","content":user_msg},
+            {"role": "system", "content":f"{system_prompt}\nCandidate books:\n{context_text}\nPrevious context:\n{msgs}"},
+            {"role": "user", "content": user_msg},
         ],
         temperature=0.6,
     )
     assistant_reply = ai.choices[0].message.content
+
     Conversation.add_message(user, conv_id, "assistant", assistant_reply)
     conv = Conversation.get_conversation(user, conv_id)
     resp = jsonify({
