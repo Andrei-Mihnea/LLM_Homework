@@ -11,6 +11,7 @@ router = Router()
 init_db()
 init_chat_db()
 
+
 @app.route('/', defaults={'path': ''}, methods=['GET', 'POST'])
 @app.route('/<path:path>', methods=['GET', 'POST'] )
 def handle_request(path):

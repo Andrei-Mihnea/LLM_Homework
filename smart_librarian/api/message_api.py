@@ -4,12 +4,13 @@ from smart_librarian.utils.auth_guard import current_user
 from smart_librarian.models.chat_db import Conversation
 from openai import OpenAI
 import os
-from smart_librarian.models.book_model import BookModel
+from smart_librarian.models.book_model import load_summaries, build_vectorstore
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
 COOKIE_CONV = "current_conv_id"
-
-VECTORSTORE = BookModel()
+summaries = load_summaries()
+VECTORSTORE = build_vectorstore(summaries)
+# print(summaries)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 

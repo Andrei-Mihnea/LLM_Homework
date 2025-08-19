@@ -8,52 +8,48 @@ from src.file_paths import SUMMARY_FILE, CHROMA_DIR
 
 
 # === Load summaries ===
-class BookModel:
-    def __init__(self):
-        self.summaries = self.load_summaries()
-        self.vectorstore = self.build_vectorstore(self.summaries)
-    def load_summaries(file_path=SUMMARY_FILE):
-        summaries = []
-        with open(file_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+def load_summaries(file_path=SUMMARY_FILE):
+    summaries = []
+    with open(file_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
 
-        current_title = None
-        current_summary = []
-        for line in lines:
-            line = line.strip()
-            if line.startswith("## Title: "):
-                if current_title and current_summary:
-                    summaries.append(Document(
-                        page_content=" ".join(current_summary),
-                        metadata={"title": current_title}
-                    ))
-                current_title = line.replace("## Title: ", "")
-                current_summary = []
-            elif line:
-                current_summary.append(line)
+    current_title = None
+    current_summary = []
+    for line in lines:
+        line = line.strip()
+        if line.startswith("## Title: "):
+            if current_title and current_summary:
+                summaries.append(Document(
+                    page_content=" ".join(current_summary),
+                    metadata={"title": current_title}
+                ))
+            current_title = line.replace("## Title: ", "")
+            current_summary = []
+        elif line:
+            current_summary.append(line)
 
-        if current_title and current_summary:
-            summaries.append(Document(
-                page_content=" ".join(current_summary),
-                metadata={"title": current_title}
-            ))
+    if current_title and current_summary:
+        summaries.append(Document(
+            page_content=" ".join(current_summary),
+            metadata={"title": current_title}
+        ))
 
-        return summaries
+    return summaries
 
-    # === Embed and store in Chroma using LangChain ===
-    def build_vectorstore(docs):
-        if Path(CHROMA_DIR).exists():
-            print("🔁 Reusing existing ChromaDB")
-            return Chroma(persist_directory=CHROMA_DIR, embedding_function=OpenAIEmbeddings())
+# === Embed and store in Chroma using LangChain ===
+def build_vectorstore(docs):
+    if Path(CHROMA_DIR).exists():
+        print("🔁 Reusing existing ChromaDB")
+        return Chroma(persist_directory=CHROMA_DIR, embedding_function=OpenAIEmbeddings())
 
-        print("🔨 Building new Chroma vectorstore")
-        vectorstore = Chroma.from_documents(
-            documents=docs,
-            embedding=OpenAIEmbeddings(),
-            persist_directory=CHROMA_DIR
-        )
-        vectorstore.persist()
-        return vectorstore
+    print("🔨 Building new Chroma vectorstore")
+    vectorstore = Chroma.from_documents(
+        documents=docs,
+        embedding=OpenAIEmbeddings(),
+        persist_directory=CHROMA_DIR
+    )
+    vectorstore.persist()
+    return vectorstore
 
 # === Query the vectorstore ===
 # def query_books(vectorstore, query, top_k=3):
