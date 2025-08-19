@@ -14,24 +14,28 @@ VECTORSTORE = build_vectorstore(summaries)
 # print(summaries)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-tool = {
+tools = [
+    {
         "type": "function",
-        "name": "get_summary_by_title",
-        "description": "Retrieves summary for the given title.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "title": {
-                    "type": "string",
-                    "enum": titles,
-                    "description": "Title of a given  book e.g. Harry Potter, Little Prince etc"
-                }
+        "function": {
+            "name": "get_summary_by_title",
+            "description": "Retrieves the FULL summary for the given exact book title.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "enum": titles,
+                        "description": "Exact title of the book (must match a candidate)."
+                    }
+                },
+                "required": ["title"],
+                "additionalProperties": False
             },
-            "required": ["title"],
-            "additionalProperties": False
-        },
-        "strict": True
+            "strict": True
+        }
     }
+]
 
 def _require_user():
     u = current_user()
@@ -98,52 +102,76 @@ def api_send():
 
     conv_id = data.get("conv_id") or request.cookies.get(COOKIE_CONV) or Conversation.create_conversation(user, "New chat")
     conv_id = int(conv_id)
-    conv = Conversation.get_conversation(user, conv_id) or Conversation.get_conversation(user, Conversation.create_conversation(user, "New chat"))
+    conv = Conversation.get_conversation(user, conv_id) or Conversation.get_conversation(
+        user, Conversation.create_conversation(user, "New chat")
+    )
 
     if not conv.get("messages"):
         Conversation.set_title(user, conv_id, user_msg[:60])
     Conversation.add_message(user, conv_id, "user", user_msg)
-
-    # RAG context
-    docs = VECTORSTORE.similarity_search_with_relevance_scores(user_msg, k=3)
-    context_text = "\n\n".join(
-        f"Title: {d.metadata.get('title','Untitled')}\nRelevance: {score:.2f}\nSummary: {d.page_content}"
-        for d, score in docs
-    )
-    print(context_text)
-
     msgs = conv.get("messages", [])
+    # === RAG: top-k candidați + scoruri ===
+    docs = VECTORSTORE.similarity_search_with_relevance_scores(user_msg, k=3)
+    candidates_text = "\n\n".join(
+        f"- id: {i+1}\n  title: {d.metadata.get('title', 'Untitled')}\n  relevance: {score:.2f}"
+        for i, (d, score) in enumerate(docs)
+    )
+
+    # === Prompt assistant (reguli clare) ===
     system_prompt = (
         "You are a friendly book recommendation assistant.\n"
         "HARD RULES:\n"
-        "- Recommend ONLY from the CANDIDATES list (by id).\n"
-        "- If nothing fits, ask 1–2 clarifying questions instead of inventing titles.\n"
-        "- Use the tool only when you find from the CANDIDATES list\n"
-        "- Don't use the tool when there are used conversation starters or non books related questions"
-        "CANDIDATES are provided via tool schema.\n"
+        "- Recommend ONLY from the CANDIDATES list (by exact title).\n"
+        "- After you decide the best title, CALL the function get_summary_by_title with that exact title.\n"
+        "- If nothing fits, ask up to 2 clarifying questions instead of inventing titles.\n"
+        "- Do NOT call the tool for conversation starters or non-book questions.\n"
+        "Return a short recommendation first (one short paragraph), then we'll show the full summary below.\n"
+        "CANDIDATES:\n"
+        f"{candidates_text}\n"
+        f"Previous messages{msgs}"
     )
 
-    # NOTE: If/when you want tool calling, pass a `tools=[...]` param here and handle tool calls.
-    # For now, behavior matches your previous code (no tool execution loop).
-    resp = client.responses.create(
+    ctx_messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_msg},
+    ]
+
+    # === 1) LLM generează recomandarea și (dacă e cazul) un tool-call ===
+    ai = client.chat.completions.create(
         model="gpt-4o-mini",
-        input=[
-            {"role": "system", "content": f"{system_prompt}\nCandidate books:\n{context_text}\nPrevious context:\n{msgs}"},
-            {"role": "user", "content": user_msg},
-        ],
-        temperature=0.6,
-        # tools=[{"type": "function", "function": tool}],  # Optional: enable later with a tool-call loop
+        messages=ctx_messages,
+        temperature=0.0,
+        tools=tools,
+        tool_choice="auto"
     )
-
-    assistant_reply = resp.output_text or ""  # output_text is a convenience string
-    Conversation.add_message(user, conv_id, "assistant", assistant_reply)
+    function_call = None
+    function_call_arguments = None
+    assistant_raw_reply = ai.choices[0].message
+    assistant_response = assistant_raw_reply.content or ""
+    # print(first.output)
+    tool_calls = assistant_raw_reply.tool_calls or []
+    for call in tool_calls:
+        if call.type == "function" and call.function and call.function.name == "get_summary_by_title":
+            print(f"Function called {call.function.name}")
+             # arguments e un string JSON
+            raw_args = call.function.arguments or "{}"
+            try:
+                args = json.loads(raw_args)
+            except json.JSONDecodeError:
+                args = {}
+            title = (args.get("title") or "").strip()
+            if title:
+                summary_text = get_summary_by_title(title)
+                assistant_response += f"\n\nRezumatul complet „{title}”\n{summary_text}"
+            break  # avem un si
+    Conversation.add_message(user, conv_id, "assistant", assistant_response)
 
     conv = Conversation.get_conversation(user, conv_id)
     resp_json = jsonify({
         "ok": True,
         "conv": {"id": conv_id, "title": conv["title"]},
         "messages": conv.get("messages", []),
-        "assistant_reply": assistant_reply,
+        "assistant_reply": assistant_response,
     })
     resp_json.set_cookie(COOKIE_CONV, str(conv_id), httponly=True, samesite="Strict")
     return resp_json

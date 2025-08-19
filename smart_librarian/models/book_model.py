@@ -58,9 +58,12 @@ def build_vectorstore(docs):
     vectorstore.persist()
     return vectorstore
 
-def get_summary_by_title(title:str)->str:
+def get_summary_by_title(title: str) -> str:
+    summary = book_summaries_dict.get(title, [])
+    if isinstance(summary, list):
+        return " ".join(summary)
+    return summary or ""
 
-    return book_summaries_dict.get(title, "")
 
 
 
