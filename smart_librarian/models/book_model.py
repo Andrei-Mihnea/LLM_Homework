@@ -6,7 +6,8 @@ from langchain.text_splitter import CharacterTextSplitter
 from pathlib import Path
 from src.file_paths import SUMMARY_FILE, CHROMA_DIR
 
-
+book_summaries_dict = {}
+titles = []
 # === Load summaries ===
 def load_summaries(file_path=SUMMARY_FILE):
     summaries = []
@@ -23,17 +24,23 @@ def load_summaries(file_path=SUMMARY_FILE):
                     page_content=" ".join(current_summary),
                     metadata={"title": current_title}
                 ))
+                book_summaries_dict[current_title] = current_summary
+                titles.append(current_title)
             current_title = line.replace("## Title: ", "")
             current_summary = []
         elif line:
             current_summary.append(line)
 
     if current_title and current_summary:
+        # print(f"titlu curent:{current_title}\n rezumat:{current_summary}")
+        book_summaries_dict[current_title] = current_summary
+        titles.append(current_title)
         summaries.append(Document(
             page_content=" ".join(current_summary),
             metadata={"title": current_title}
         ))
-
+    # print("aici apare book summaries")
+    # print(book_summaries_dict)
     return summaries
 
 # === Embed and store in Chroma using LangChain ===
@@ -51,26 +58,12 @@ def build_vectorstore(docs):
     vectorstore.persist()
     return vectorstore
 
-# === Query the vectorstore ===
-# def query_books(vectorstore, query, top_k=3):
-#     results = vectorstore.similarity_search_with_relevance_scores(query, k=top_k)
-#     for i, (doc, score) in enumerate(results):
-#         print(f"{i+1}. {doc.metadata['title']} (score: {score:.2f})")
-#         print(f"   ➤ {doc.page_content}\n")
+def get_summary_by_title(title:str)->str:
 
-# # === CLI Driver ===
-# if __name__ == "__main__":
-#     print("📚 Loading book summaries...")
-#     docs = load_summaries()
-    
-#     print("🔗 Initializing vector store with LangChain...")
-#     vectorstore = build_vectorstore(docs)
+    return book_summaries_dict.get(title, "")
 
-#     print("\n🤖 Ready to chat with RAG!")
-#     while True:
-#         query = input("\nEnter a theme or interest (or 'exit'): ")
-#         if query.strip().lower() in ["exit", "quit"]:
-#             break
-#         query_books(vectorstore, query)
+
+
+
 
 

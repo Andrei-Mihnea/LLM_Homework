@@ -2,9 +2,10 @@
 from flask import Blueprint, request, jsonify
 from smart_librarian.utils.auth_guard import current_user
 from smart_librarian.models.chat_db import Conversation
+import json
 from openai import OpenAI
 import os
-from smart_librarian.models.book_model import load_summaries, build_vectorstore
+from smart_librarian.models.book_model import load_summaries, build_vectorstore,get_summary_by_title,titles
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
 COOKIE_CONV = "current_conv_id"
@@ -13,6 +14,24 @@ VECTORSTORE = build_vectorstore(summaries)
 # print(summaries)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+tool = {
+        "type": "function",
+        "name": "get_summary_by_title",
+        "description": "Retrieves summary for the given title.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "enum": titles,
+                    "description": "Title of a given  book e.g. Harry Potter, Little Prince etc"
+                }
+            },
+            "required": ["title"],
+            "additionalProperties": False
+        },
+        "strict": True
+    }
 
 def _require_user():
     u = current_user()
@@ -69,48 +88,62 @@ def api_delete():
 @api_bp.post("/send")
 def api_send():
     user, err = _require_user()
-    if err: 
+    if err:
         return err
+
     data = request.get_json(silent=True) or {}
     user_msg = (data.get("message") or "").strip()
-    if not user_msg: return jsonify({"error":"empty_message"}), 400
+    if not user_msg:
+        return jsonify({"error": "empty_message"}), 400
+
     conv_id = data.get("conv_id") or request.cookies.get(COOKIE_CONV) or Conversation.create_conversation(user, "New chat")
     conv_id = int(conv_id)
     conv = Conversation.get_conversation(user, conv_id) or Conversation.get_conversation(user, Conversation.create_conversation(user, "New chat"))
-    if not conv.get("messages"): Conversation.set_title(user, conv_id, user_msg[:60])
+
+    if not conv.get("messages"):
+        Conversation.set_title(user, conv_id, user_msg[:60])
     Conversation.add_message(user, conv_id, "user", user_msg)
 
+    # RAG context
     docs = VECTORSTORE.similarity_search_with_relevance_scores(user_msg, k=3)
     context_text = "\n\n".join(
         f"Title: {d.metadata.get('title','Untitled')}\nRelevance: {score:.2f}\nSummary: {d.page_content}"
         for d, score in docs
     )
     print(context_text)
+
     msgs = conv.get("messages", [])
     system_prompt = (
-                    "You are a friendly book recommendation assistant.\n"
-                    "HARD RULES:\n"
-                    "- Recommend ONLY from the CANDIDATES list (by id).\n"
-                    "- If nothing fits, ask 1–2 clarifying questions instead of inventing titles.\n"
-                    "CANDIDATES are provided via tool schema.\n"
-                    )
-    ai = client.chat.completions.create(
+        "You are a friendly book recommendation assistant.\n"
+        "HARD RULES:\n"
+        "- Recommend ONLY from the CANDIDATES list (by id).\n"
+        "- If nothing fits, ask 1–2 clarifying questions instead of inventing titles.\n"
+        "- Use the tool only when you find from the CANDIDATES list\n"
+        "- Don't use the tool when there are used conversation starters or non books related questions"
+        "CANDIDATES are provided via tool schema.\n"
+    )
+
+    # NOTE: If/when you want tool calling, pass a `tools=[...]` param here and handle tool calls.
+    # For now, behavior matches your previous code (no tool execution loop).
+    resp = client.responses.create(
         model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content":f"{system_prompt}\nCandidate books:\n{context_text}\nPrevious context:\n{msgs}"},
+        input=[
+            {"role": "system", "content": f"{system_prompt}\nCandidate books:\n{context_text}\nPrevious context:\n{msgs}"},
             {"role": "user", "content": user_msg},
         ],
         temperature=0.6,
+        # tools=[{"type": "function", "function": tool}],  # Optional: enable later with a tool-call loop
     )
-    assistant_reply = ai.choices[0].message.content
 
+    assistant_reply = resp.output_text or ""  # output_text is a convenience string
     Conversation.add_message(user, conv_id, "assistant", assistant_reply)
+
     conv = Conversation.get_conversation(user, conv_id)
-    resp = jsonify({
+    resp_json = jsonify({
         "ok": True,
         "conv": {"id": conv_id, "title": conv["title"]},
         "messages": conv.get("messages", []),
         "assistant_reply": assistant_reply,
     })
-    resp.set_cookie(COOKIE_CONV, str(conv_id), httponly=True, samesite="Strict")
-    return resp
+    resp_json.set_cookie(COOKIE_CONV, str(conv_id), httponly=True, samesite="Strict")
+    return resp_json
