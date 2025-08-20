@@ -116,11 +116,12 @@ def api_send():
         f"- id: {i+1}\n  title: {d.metadata.get('title', 'Untitled')}\n  relevance: {score:.2f}"
         for i, (d, score) in enumerate(docs)
     )
-
+    print(msgs)
     # === Prompt assistant (reguli clare) ===
     system_prompt = (
         "You are a friendly book recommendation assistant.\n"
         "HARD RULES:\n"
+        "-Add the summary only if the tool is called in the last message\n"
         "- Recommend ONLY from the CANDIDATES list (by exact title).\n"
         "- After you decide the best title, CALL the function get_summary_by_title with that exact title.\n"
         "- If nothing fits, ask up to 2 clarifying questions instead of inventing titles.\n"
@@ -128,29 +129,48 @@ def api_send():
         "Return a short recommendation first (one short paragraph), then we'll show the full summary below.\n"
         "CANDIDATES:\n"
         f"{candidates_text}\n"
-        f"Previous messages{msgs}"
     )
 
     ctx_messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_msg},
     ]
-
+    for m in msgs:
+        ctx_messages.append(m)
+    ctx_messages.append( {"role": "user", "content": user_msg})
+    # print(f"ctx_messages={ctx_messages}")
     # === 1) LLM generează recomandarea și (dacă e cazul) un tool-call ===
+
+    # ai_tool = client.chat.completions.create(
+    #     model="gpt-4o-mini",
+    #     messages=ctx_messages,
+    #     temperature=0.0,
+    #     tools=tools,
+    #     tool_choice={"type":"function", "function":{"name":"get_summary_by_title"}}
+    # )
+
     ai = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=ctx_messages,
         temperature=0.0,
         tools=tools,
         tool_choice="auto"
+
     )
-    function_call = None
-    function_call_arguments = None
-    assistant_raw_reply = ai.choices[0].message
-    assistant_response = assistant_raw_reply.content or ""
+
+
+    # function_call = None
+    # function_call_arguments = None
+    # tool_raw_reply = ai_tool.choices[0].message
+    assistant_response_raw = ai.choices[0].message
+    assistant_response = assistant_response_raw.content or ""
+    # print(tool_raw_reply.content)
+    print(assistant_response_raw)
     # print(first.output)
-    tool_calls = assistant_raw_reply.tool_calls or []
+    tool_calls = assistant_response_raw.tool_calls or []
+    if tool_calls == []:
+        print("tool_calls este gol")
     for call in tool_calls:
+        print(f"Function called {call.function.name}")
         if call.type == "function" and call.function and call.function.name == "get_summary_by_title":
             print(f"Function called {call.function.name}")
              # arguments e un string JSON
