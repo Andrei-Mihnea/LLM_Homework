@@ -1,8 +1,10 @@
 # smart_librarian/api/message_api.py
 from flask import Blueprint, request, jsonify
 from smart_librarian.utils.auth_guard import current_user
+from smart_librarian.utils.message_helper import check_profanity
 from smart_librarian.models.chat_db import Conversation
 import json
+from uuid import uuid4
 from openai import OpenAI
 import os
 from smart_librarian.models.book_model import load_summaries, build_vectorstore,get_summary_by_title,titles
@@ -106,10 +108,28 @@ def api_send():
         user, Conversation.create_conversation(user, "New chat")
     )
 
+    # --- PROFANITY: show but don't persist ---
+    if check_profanity(client, user_msg) is True:
+        warning = ("Inappropriate language was detected. This message was flagged and you won't get a reply for it. "
+                "Please use an appropriate manner")
+        resp_json = jsonify({
+            "ok": True,
+            "conv": {"id": conv_id, "title": conv["title"]},
+            "messages": conv.get("messages", []),  # DB-backed; unchanged
+            # NEW: UI-only hints
+            "profanity_warning": warning,
+            "ephemeral_user_message": user_msg
+        })
+        resp_json.set_cookie(COOKIE_CONV, str(conv_id), httponly=True, samesite="Strict")
+        return resp_json
+
+    
     if not conv.get("messages"):
         Conversation.set_title(user, conv_id, user_msg[:60])
     Conversation.add_message(user, conv_id, "user", user_msg)
     msgs = conv.get("messages", [])
+    
+    
     # === RAG: top-k candidați + scoruri ===
     docs = VECTORSTORE.similarity_search_with_relevance_scores(user_msg, k=3)
     candidates_text = "\n\n".join(

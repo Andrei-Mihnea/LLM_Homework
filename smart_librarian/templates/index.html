@@ -55,6 +55,17 @@
     @keyframes pulse{0%{transform:scale(.9);opacity:.75}50%{transform:scale(1);opacity:1}100%{transform:scale(.9);opacity:.75}}
     .headline{font-size:28px;font-weight:800;margin:0;background:linear-gradient(135deg,var(--accent1),var(--accent3));-webkit-background-clip:text;background-clip:text;color:transparent}
     .tagline{margin:10px 0 16px;color:var(--muted)}
+
+    /* NEW: styles for ephemeral and warning bubbles */
+    .bubble.ephemeral{opacity:.95;border-style:dashed}
+    .bubble.warning{border-color:rgba(255,123,148,.45);box-shadow:0 0 0 1px rgba(255,123,148,.1) inset}
+    .bubble.ephemeral::after{
+      content:"  (not saved)";
+      font-size:11px;
+      color:var(--muted);
+      margin-left:6px;
+      opacity:.85;
+    }
   </style>
 </head>
 <body>
@@ -72,7 +83,6 @@
       </div>
 
       <div class="list" id="convList">
-        <!-- filled by JS -->
         <div class="row">Loading...</div>
       </div>
     </aside>
@@ -163,8 +173,16 @@
 
     function renderMessages(list){
       messagesEl.innerHTML = '';
-      if (!list.length){
-        messagesEl.innerHTML = '<div class="welcome"><div class="welcome-card"><div class="sparkle"></div><h1 class="headline">Start a new chat or pick one from the left</h1><p class="tagline">Not sure what to ask? Ask anything and you will receive immediate indications</p></div></div>';
+      // show welcome card ONLY if no conv is open at all
+      if ((!list.length) && !currentConvId){
+        messagesEl.innerHTML = `
+          <div class="welcome">
+            <div class="welcome-card">
+              <div class="sparkle"></div>
+              <h1 class="headline">Start a new chat or pick one from the left</h1>
+              <p class="tagline">Not sure what to ask? Ask anything and you will receive immediate indications</p>
+            </div>
+          </div>`;
         return;
       }
       list.forEach((m, i) => {
@@ -227,34 +245,67 @@
       const isJSON = (res.headers.get('content-type') || '').includes('application/json');
       if (!res.ok || !isJSON){
         const errDiv = document.createElement('div');
-        errDiv.className = 'bubble assistant';
+        errDiv.className = 'bubble assistant warning ephemeral';
         errDiv.style.borderColor = 'rgba(255,0,0,.3)';
         errDiv.textContent = 'Failed to send. Please try again.';
         messagesEl.appendChild(errDiv);
         return;
       }
+
       const data = await res.json();
       if (data.error) return;
       currentConvId = data.conv.id;
-      // re-render messages to stay in sync with server history
+
+      // Re-render messages to stay in sync with server history
       renderMessages(data.messages || []);
+
+      // If server flagged profanity, show ephemeral user message + warning
+      if (data.profanity_warning) {
+        const metaUser = document.createElement('div');
+        metaUser.className = 'meta';
+        metaUser.textContent = 'you (not saved)';
+        const bubbleUser = document.createElement('div');
+        bubbleUser.className = 'bubble user ephemeral';
+        bubbleUser.textContent = data.ephemeral_user_message || '';
+        messagesEl.appendChild(metaUser);
+        messagesEl.appendChild(bubbleUser);
+
+        const metaWarn = document.createElement('div');
+        metaWarn.className = 'meta';
+        metaWarn.textContent = 'assistant (warning)';
+        const bubbleWarn = document.createElement('div');
+        bubbleWarn.className = 'bubble assistant warning ephemeral';
+        bubbleWarn.setAttribute('role','alert');
+        bubbleWarn.textContent = data.profanity_warning;
+        messagesEl.appendChild(metaWarn);
+        messagesEl.appendChild(bubbleWarn);
+
+        scrollToBottom();
+      }
+
       await loadList();
     });
 
-    // boot: load list, then try opening most recent (server has cookie)
     (async function init(){
       await loadList();
-      // best effort: if there is at least one conv, open first
       const firstRow = convList.querySelector('.row button');
       if (firstRow) firstRow.click();
     })();
 
-    // sidebar toggle
     const sidebar = document.getElementById('sidebar');
     const openSide = document.getElementById('openSide');
     const closeSide = document.getElementById('closeSide');
     const backdrop = document.getElementById('backdrop');
-    function toggleSide(open){ if (!sidebar) return; if (open){ sidebar.classList.add('open'); backdrop && backdrop.classList.add('show'); } else { sidebar.classList.remove('open'); backdrop && backdrop.classList.remove('show'); } }
+    function toggleSide(open){
+      if (!sidebar) return;
+      if (open){
+        sidebar.classList.add('open');
+        backdrop && backdrop.classList.add('show');
+      } else {
+        sidebar.classList.remove('open');
+        backdrop && backdrop.classList.remove('show');
+      }
+    }
     openSide && openSide.addEventListener('click', () => toggleSide(true));
     closeSide && closeSide.addEventListener('click', () => toggleSide(false));
     backdrop && backdrop.addEventListener('click', () => toggleSide(false));
