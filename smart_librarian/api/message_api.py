@@ -1,13 +1,16 @@
 # smart_librarian/api/message_api.py
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify,Response
 from smart_librarian.utils.auth_guard import current_user
-from smart_librarian.utils.message_helper import check_profanity
+from smart_librarian.utils.message_helper import check_profanity,sanitize_ctx_messages
 from smart_librarian.models.chat_db import Conversation
 import json
 from uuid import uuid4
 from openai import OpenAI
+import tempfile
 import os
 from smart_librarian.models.book_model import load_summaries, build_vectorstore,get_summary_by_title,titles
+import base64
+import io
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
 COOKIE_CONV = "current_conv_id"
@@ -150,23 +153,15 @@ def api_send():
         "CANDIDATES:\n"
         f"{candidates_text}\n"
     )
-
+    
     ctx_messages = [
         {"role": "system", "content": system_prompt},
     ]
+    msgs = sanitize_ctx_messages(msgs)
+    
     for m in msgs:
         ctx_messages.append(m)
     ctx_messages.append( {"role": "user", "content": user_msg})
-    # print(f"ctx_messages={ctx_messages}")
-    # === 1) LLM generează recomandarea și (dacă e cazul) un tool-call ===
-
-    # ai_tool = client.chat.completions.create(
-    #     model="gpt-4o-mini",
-    #     messages=ctx_messages,
-    #     temperature=0.0,
-    #     tools=tools,
-    #     tool_choice={"type":"function", "function":{"name":"get_summary_by_title"}}
-    # )
 
     ai = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -177,16 +172,13 @@ def api_send():
 
     )
 
-
-    # function_call = None
-    # function_call_arguments = None
-    # tool_raw_reply = ai_tool.choices[0].message
     assistant_response_raw = ai.choices[0].message
     assistant_response = assistant_response_raw.content or ""
     # print(tool_raw_reply.content)
     print(assistant_response_raw)
     # print(first.output)
     tool_calls = assistant_response_raw.tool_calls or []
+    summary_text=""
     if tool_calls == []:
         print("tool_calls este gol")
     for call in tool_calls:
@@ -202,8 +194,117 @@ def api_send():
             title = (args.get("title") or "").strip()
             if title:
                 summary_text = get_summary_by_title(title)
-                assistant_response += f"\n\nRezumatul complet „{title}”\n{summary_text}"
-            break  # avem un si
+                assistant_response += f"\n\n „{title}”\n{summary_text}"
+            break
+    
+    # ---------- TTS ----------
+    tts_payload = None
+    tts_requested = bool(data.get("tts_enable"))
+    print(f"tts_requested = {tts_requested}", flush=True)
+
+    # Speak full summary if present; else speak assistant reply
+    tts_text = (summary_text.strip() or (assistant_response or "").strip())
+    MAX_TTS_CHARS = 1800
+    tts_text = tts_text[:MAX_TTS_CHARS]
+
+    def _to_b64(maybe_bytes):
+        if not maybe_bytes:
+            return None
+        return base64.b64encode(maybe_bytes).decode("ascii")
+
+    if tts_requested and tts_text:
+        # 1) Non-streaming without 'format' (your SDK complains about it)
+        try:
+            print("TTS: non-streaming attempt (no format)", flush=True)
+            r = client.audio.speech.create(
+                model="gpt-4o-mini-tts",
+                voice="alloy",
+                input=tts_text,
+            )
+            audio_bytes = None
+            if hasattr(r, "read"):
+                audio_bytes = r.read()
+            if audio_bytes is None:
+                audio_bytes = getattr(r, "content", None) or getattr(r, "data", None)
+            if audio_bytes is None:
+                audio_b64 = getattr(r, "audio", None)
+                if isinstance(audio_b64, str) and audio_b64.strip():
+                    tts_payload = {"audio_b64": audio_b64, "mime": "audio/mpeg", "voice": "aria"}
+            else:
+                tts_payload = {"audio_b64": _to_b64(audio_bytes), "mime": "audio/mpeg", "voice": "aria"}
+
+            if tts_payload:
+                print("TTS: non-streaming produced audio", flush=True)
+            else:
+                print("TTS: non-streaming returned nothing; trying response_format", flush=True)
+                raise RuntimeError("no_bytes_nonstream")
+        except Exception as e1:
+            print(f"TTS: non-streaming (no format) failed: {e1!r}", flush=True)
+            # 2) Non-streaming with 'response_format'
+            try:
+                print("TTS: non-streaming attempt (response_format='mp3')", flush=True)
+                r = client.audio.speech.create(
+                    model="gpt-4o-mini-tts",
+                    voice="aria",
+                    input=tts_text,
+                    response_format="mp3",
+                )
+                audio_bytes = None
+                if hasattr(r, "read"):
+                    audio_bytes = r.read()
+                if audio_bytes is None:
+                    audio_bytes = getattr(r, "content", None) or getattr(r, "data", None)
+                if audio_bytes is None:
+                    audio_b64 = getattr(r, "audio", None)
+                    if isinstance(audio_b64, str) and audio_b64.strip():
+                        tts_payload = {"audio_b64": audio_b64, "mime": "audio/mpeg", "voice": "aria"}
+                else:
+                    tts_payload = {"audio_b64": _to_b64(audio_bytes), "mime": "audio/mpeg", "voice": "aria"}
+
+                if tts_payload:
+                    print("TTS: non-streaming (response_format) produced audio", flush=True)
+                else:
+                    print("TTS: still nothing; trying streaming", flush=True)
+                    raise RuntimeError("no_bytes_nonstream_2")
+            except Exception as e2:
+                print(f"TTS: non-streaming (response_format) failed: {e2!r}", flush=True)
+                # 3) Streaming to a temp file (most compatible)
+                try:
+                    print("TTS: streaming attempt to temp file", flush=True)
+                    with tempfile.NamedTemporaryFile(prefix="tts_", suffix=".mp3", delete=False) as tmp:
+                        tmp_path = tmp.name
+
+                    # Some SDKs accept 'format', others 'response_format'; try both
+                    try:
+                        with client.audio.speech.with_streaming_response.create(
+                            model="gpt-4o-mini-tts",
+                            voice="aria",
+                            input=tts_text,
+                            response_format="mp3",
+                        ) as resp:
+                            resp.stream_to_file(tmp_path)
+                    except TypeError:
+                        with client.audio.speech.with_streaming_response.create(
+                            model="gpt-4o-mini-tts",
+                            voice="aria",
+                            input=tts_text,
+                            format="mp3",
+                        ) as resp:
+                            resp.stream_to_file(tmp_path)
+
+                    with open(tmp_path, "rb") as f:
+                        audio_bytes = f.read()
+
+                    if audio_bytes:
+                        print(f"TTS: streaming bytes: {len(audio_bytes)}", flush=True)
+                        tts_payload = {"audio_b64": _to_b64(audio_bytes), "mime": "audio/mpeg", "voice": "aria"}
+                    else:
+                        print("TTS: streaming produced empty file", flush=True)
+                        tts_payload = {"error": "tts_failed_no_audio"}
+                except Exception as e3:
+                    print(f"TTS: streaming failed: {e3!r}", flush=True)
+                    tts_payload = {"error": "tts_exception", "detail": str(e3)}
+    
     Conversation.add_message(user, conv_id, "assistant", assistant_response)
 
     conv = Conversation.get_conversation(user, conv_id)
@@ -212,6 +313,7 @@ def api_send():
         "conv": {"id": conv_id, "title": conv["title"]},
         "messages": conv.get("messages", []),
         "assistant_reply": assistant_response,
+        "tts":tts_payload
     })
     resp_json.set_cookie(COOKIE_CONV, str(conv_id), httponly=True, samesite="Strict")
     return resp_json

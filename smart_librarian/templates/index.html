@@ -46,7 +46,7 @@
     .field{flex:1;display:flex;flex-direction:column;gap:6px}
     .field label{font-size:12px;color:var(--muted)}
     input[type="text"]{flex:1;background:#0e1116;border:1px solid var(--border);border-radius:10px;color:var(--text);padding:12px}
-    .actions{display:flex;gap:8px}
+    .actions{display:flex;gap:10px;align-items:center}
     button.send{padding:12px 14px;border-radius:10px;border:0;background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#0b0d10;font-weight:800;cursor:pointer;white-space:nowrap}
     .welcome{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px}
     .welcome-card{max-width:780px;width:100%;text-align:center;padding:36px 30px;border:1px solid var(--border);border-radius:16px;background:linear-gradient(180deg,#0f1420 0%,#0d1015 100%);box-shadow:0 0 22px rgba(124,153,255,.18);animation:glow 3s ease-in-out infinite alternate}
@@ -56,16 +56,22 @@
     .headline{font-size:28px;font-weight:800;margin:0;background:linear-gradient(135deg,var(--accent1),var(--accent3));-webkit-background-clip:text;background-clip:text;color:transparent}
     .tagline{margin:10px 0 16px;color:var(--muted)}
 
-    /* NEW: styles for ephemeral and warning bubbles */
+    /* Ephemeral & warning */
     .bubble.ephemeral{opacity:.95;border-style:dashed}
     .bubble.warning{border-color:rgba(255,123,148,.45);box-shadow:0 0 0 1px rgba(255,123,148,.1) inset}
-    .bubble.ephemeral::after{
-      content:"  (not saved)";
-      font-size:11px;
-      color:var(--muted);
-      margin-left:6px;
-      opacity:.85;
-    }
+    .bubble.ephemeral::after{content:"  (not saved)";font-size:11px;color:var(--muted);margin-left:6px;opacity:.85}
+
+    /* TTS toggle */
+    .tts-toggle{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:#0e1116}
+    .tts-toggle input{margin:0}
+    .tts-toggle span{font-size:12px;color:var(--muted)}
+
+    /* Audio bubble */
+    .audio-bubble{display:flex;align-items:center;gap:12px}
+    .audio-btn{width:38px;height:38px;border-radius:50%;border:0;background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#0b0d10;font-weight:800;cursor:pointer}
+    .audio-timeline{flex:1;height:8px;border-radius:999px;background:#1b2230;position:relative;overflow:hidden;cursor:pointer}
+    .audio-progress{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent3)}
+    .audio-time{font-size:12px;color:var(--muted);min-width:72px;text-align:right}
   </style>
 </head>
 <body>
@@ -111,6 +117,11 @@
             <input id="message" type="text" name="message" placeholder="Ask for cozy fantasy with found family..." required />
           </div>
           <div class="actions">
+            <!-- Send the flag your backend expects: tts_enable -->
+            <label class="tts-toggle" title="Generate an audio version of the assistant's reply">
+              <input id="ttsToggle" type="checkbox" />
+              <span>Audio reply</span>
+            </label>
             <button class="send" type="submit">Send</button>
           </div>
         </form>
@@ -123,9 +134,11 @@
     const messagesEl = document.getElementById('messages');
     const chatTitle = document.getElementById('chatTitle');
     const newBtn = document.getElementById('newChatBtn');
+    const ttsToggle = document.getElementById('ttsToggle');
 
     let currentConvId = null;
 
+    /* ---------- helpers ---------- */
     function el(tag, attrs={}, html=''){
       const e = document.createElement(tag);
       Object.entries(attrs).forEach(([k,v]) => e.setAttribute(k,v));
@@ -133,7 +146,19 @@
       return e;
     }
     function scrollToBottom(){ messagesEl.scrollTop = messagesEl.scrollHeight; }
+    function fmtTime(s){ s = Math.max(0, s|0); const m=(s/60)|0; const r=(s%60)|0; return `${m}:${r.toString().padStart(2,'0')}`; }
 
+    // client-side sanitization to hide accidental <audio>…</audio> and huge base64 strings from display
+    function sanitizeForDisplay(text){
+      if (typeof text !== 'string') return text;
+      // strip <audio>…</audio>
+      text = text.replace(/<audio>.*?<\/audio>/gis, '');
+      // replace suspiciously long base64-looking chunks
+      text = text.replace(/[A-Za-z0-9+/=]{100,}/g, '[audio removed]');
+      return text.trim();
+    }
+
+    /* ---------- list & conversations ---------- */
     async function loadList(){
       const r = await fetch('/api/list');
       const data = await r.json();
@@ -173,7 +198,6 @@
 
     function renderMessages(list){
       messagesEl.innerHTML = '';
-      // show welcome card ONLY if no conv is open at all
       if ((!list.length) && !currentConvId){
         messagesEl.innerHTML = `
           <div class="welcome">
@@ -188,7 +212,7 @@
       list.forEach((m, i) => {
         const meta = el('div', {class:'meta'}, `${i+1} · ${m.role}`);
         const bubble = el('div', {class:`bubble ${m.role === 'user' ? 'user' : 'assistant'}`});
-        bubble.textContent = m.content;
+        bubble.textContent = sanitizeForDisplay(m.content); // 👈 prevent <audio> b64 appearing in UI
         messagesEl.appendChild(meta);
         messagesEl.appendChild(bubble);
       });
@@ -217,7 +241,85 @@
       await openConv(data.conv.id);
     });
 
-    // send message
+    /* ---------- Audio bubble UI (play/pause, progress, seek) ---------- */
+    function createAudioBubbleFromBlob(blob, voiceLabel=''){
+      const url = URL.createObjectURL(blob);
+
+      const wrapperMeta = el('div', {class:'meta'}, `assistant (audio${voiceLabel ? ' · '+voiceLabel : ''})`);
+      const wrapper = el('div', {class:'bubble assistant'});
+
+      const ctr = el('div', {class:'audio-bubble'});
+      const btn = el('button', {class:'audio-btn', type:'button'}, '▶');
+      const bar = el('div', {class:'audio-timeline'});
+      const prog = el('div', {class:'audio-progress'});
+      bar.appendChild(prog);
+      const time = el('div', {class:'audio-time'}, '0:00 / 0:00');
+
+      const audio = new Audio(url);
+      audio.preload = 'metadata';
+
+      let rafId = null;
+      function startLoop(){
+        cancelAnimationFrame(rafId);
+        const loop = () => {
+          if (audio.duration && !isNaN(audio.duration)){
+            const p = (audio.currentTime / audio.duration) * 100;
+            prog.style.width = `${Math.min(100, Math.max(0, p))}%`;
+            time.textContent = `${fmtTime(audio.currentTime)} / ${fmtTime(audio.duration)}`;
+          }
+          if (!audio.paused) rafId = requestAnimationFrame(loop);
+        };
+        rafId = requestAnimationFrame(loop);
+      }
+
+      btn.addEventListener('click', () => {
+        if (audio.paused) { audio.play(); btn.textContent = '⏸'; startLoop(); }
+        else { audio.pause(); btn.textContent = '▶'; cancelAnimationFrame(rafId); }
+      });
+
+      audio.addEventListener('loadedmetadata', () => {
+        time.textContent = `0:00 / ${fmtTime(audio.duration)}`;
+      });
+      audio.addEventListener('ended', () => {
+        btn.textContent = '▶';
+        cancelAnimationFrame(rafId);
+        prog.style.width = '0%';
+        time.textContent = `0:00 / ${fmtTime(audio.duration || 0)}`;
+      });
+
+      // Click-to-seek
+      bar.addEventListener('click', (e) => {
+        const rect = bar.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const pct = Math.min(Math.max(x / rect.width, 0), 1);
+        if (audio.duration && !isNaN(audio.duration)) {
+          audio.currentTime = pct * audio.duration;
+          if (!audio.paused) startLoop();
+          else {
+            const p = pct * 100;
+            prog.style.width = `${p}%`;
+            time.textContent = `${fmtTime(audio.currentTime)} / ${fmtTime(audio.duration)}`;
+          }
+        }
+      });
+
+      ctr.appendChild(btn); ctr.appendChild(bar); ctr.appendChild(time);
+      wrapper.appendChild(ctr);
+
+      messagesEl.appendChild(wrapperMeta);
+      messagesEl.appendChild(wrapper);
+      scrollToBottom();
+    }
+
+    function b64ToBlob(b64, mime='audio/mpeg'){
+      const bin = atob(b64);
+      const len = bin.length;
+      const bytes = new Uint8Array(len);
+      for (let i=0;i<len;i++) bytes[i] = bin.charCodeAt(i);
+      return new Blob([bytes], {type: mime});
+    }
+
+    /* ---------- send message ---------- */
     const form = document.getElementById('chatForm');
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -240,7 +342,11 @@
       const res = await fetch('/api/send', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({message:text, conv_id: currentConvId})
+        body: JSON.stringify({
+          message: text,
+          conv_id: currentConvId,
+          tts_enable: ttsToggle.checked   // 👈 exactly what your backend reads
+        })
       });
       const isJSON = (res.headers.get('content-type') || '').includes('application/json');
       if (!res.ok || !isJSON){
@@ -281,17 +387,29 @@
         messagesEl.appendChild(bubbleWarn);
 
         scrollToBottom();
+        await loadList();
+        return;
+      }
+
+      // If backend returned TTS payload with base64, render audio bubble
+      if (data.tts && data.tts.audio_b64 && !data.tts.error) {
+        const mime = data.tts.mime || 'audio/mpeg';
+        const voice = data.tts.voice || '';
+        const blob = b64ToBlob(data.tts.audio_b64, mime);
+        createAudioBubbleFromBlob(blob, voice);
       }
 
       await loadList();
     });
 
+    /* ---------- boot ---------- */
     (async function init(){
       await loadList();
       const firstRow = convList.querySelector('.row button');
       if (firstRow) firstRow.click();
     })();
 
+    /* ---------- sidebar toggle ---------- */
     const sidebar = document.getElementById('sidebar');
     const openSide = document.getElementById('openSide');
     const closeSide = document.getElementById('closeSide');
