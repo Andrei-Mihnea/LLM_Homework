@@ -139,7 +139,7 @@ def api_send():
         f"- id: {i+1}\n  title: {d.metadata.get('title', 'Untitled')}\n  relevance: {score:.2f}"
         for i, (d, score) in enumerate(docs)
     )
-    print(msgs)
+    # print(msgs)
     # === Prompt assistant (reguli clare) ===
     system_prompt = (
         "You are a friendly book recommendation assistant.\n"
@@ -218,6 +218,7 @@ def api_send():
 
         audio_bytes = resp.read()
         audio_b64 = base64.b64encode(audio_bytes).decode("ascii")
+        assistant_response += f"<audio>{audio_b64}</audio>"
 
         tts_payload = {
         "audio_b64": audio_b64,

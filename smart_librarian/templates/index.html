@@ -45,7 +45,7 @@
     form.chat{display:flex;gap:8px;align-items:flex-end;max-width:1200px;margin:0 auto}
     .field{flex:1;display:flex;flex-direction:column;gap:6px}
     .field label{font-size:12px;color:var(--muted)}
-    input[type="text"]{flex:1;background:#0e1116;border:1px solid var(--border);border-radius:10px;color:var(--text);padding:12px}
+    input[type="text"]{flex:1;background:#0e1116;border:1px solid var(--border);border-radius:10px;color:#0b0d10;padding:12px}
     .actions{display:flex;gap:10px;align-items:center}
     button.send{padding:12px 14px;border-radius:10px;border:0;background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#0b0d10;font-weight:800;cursor:pointer;white-space:nowrap}
     .welcome{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px}
@@ -151,11 +151,25 @@
     // client-side sanitization to hide accidental <audio>…</audio> and huge base64 strings from display
     function sanitizeForDisplay(text){
       if (typeof text !== 'string') return text;
-      // strip <audio>…</audio>
+      // strip <audio>…</audio> (we'll extract/handle them separately)
       text = text.replace(/<audio>.*?<\/audio>/gis, '');
       // replace suspiciously long base64-looking chunks
       text = text.replace(/[A-Za-z0-9+/=]{100,}/g, '[audio removed]');
       return text.trim();
+    }
+
+    // Extracts <audio ...>BASE64</audio> and returns { cleanText, audios: [{ b64, mime }] }
+    function extractAudioTags(text){
+      if (typeof text !== 'string' || !text) return { cleanText: text || '', audios: [] };
+      const audios = [];
+      const re = /<audio(?:\s+[^>]*?type=["']([^"']+)["'][^>]*)?>([\sA-Za-z0-9+/=]+)<\/audio>/gi;
+      const cleanText = text.replace(re, (_, mimeAttr, b64) => {
+        const mime = (mimeAttr && mimeAttr.trim()) || 'audio/mpeg';
+        const payload = (b64 || '').trim();
+        if (payload) audios.push({ b64: payload, mime });
+        return ''; // remove the tag from visible text
+      });
+      return { cleanText, audios };
     }
 
     /* ---------- list & conversations ---------- */
@@ -198,6 +212,7 @@
 
     function renderMessages(list){
       messagesEl.innerHTML = '';
+
       if ((!list.length) && !currentConvId){
         messagesEl.innerHTML = `
           <div class="welcome">
@@ -209,13 +224,41 @@
           </div>`;
         return;
       }
+
       list.forEach((m, i) => {
         const meta = el('div', {class:'meta'}, `${i+1} · ${m.role}`);
+
+        // 1) Extract audio tags from message content
+        const rawText = (m && m.content) ? String(m.content) : '';
+        const { cleanText, audios } = extractAudioTags(rawText);
+
+        // 2) Show cleaned text
         const bubble = el('div', {class:`bubble ${m.role === 'user' ? 'user' : 'assistant'}`});
-        bubble.textContent = sanitizeForDisplay(m.content); // 👈 prevent <audio> b64 appearing in UI
+        bubble.textContent = sanitizeForDisplay(cleanText);
         messagesEl.appendChild(meta);
         messagesEl.appendChild(bubble);
+
+        // 3) Render audio bubbles from extracted tags
+        if (Array.isArray(audios) && audios.length){
+          audios.forEach(({ b64, mime }) => {
+            if (!b64) return;
+            const blob = b64ToBlob(b64, mime || 'audio/mpeg');
+            createAudioBubbleFromBlob(blob, '');
+          });
+        }
+
+        // 4) (Optional) If you ever add persisted attachments too
+        const attachments = Array.isArray(m.attachments) ? m.attachments : [];
+        attachments.forEach(att => {
+          const isAudio = (att.type === 'audio') || ('audio_b64' in att) || ('b64' in att);
+          if (!isAudio) return;
+          const audioB64 = att.audio_b64 || att.b64;
+          if (!audioB64) return;
+          const blob = b64ToBlob(audioB64, att.mime || 'audio/mpeg');
+          createAudioBubbleFromBlob(blob, att.voice || '');
+        });
       });
+
       scrollToBottom();
     }
 
@@ -391,13 +434,9 @@
         return;
       }
 
-      // If backend returned TTS payload with base64, render audio bubble
-      if (data.tts && data.tts.audio_b64 && !data.tts.error) {
-        const mime = data.tts.mime || 'audio/mpeg';
-        const voice = data.tts.voice || '';
-        const blob = b64ToBlob(data.tts.audio_b64, mime);
-        createAudioBubbleFromBlob(blob, voice);
-      }
+      // We no longer render audio directly from `data.tts` to avoid duplicates.
+      // The audio is already in the saved message content as <audio>...</audio>
+      // and `renderMessages` will rebuild the audio bubble from history.
 
       await loadList();
     });
