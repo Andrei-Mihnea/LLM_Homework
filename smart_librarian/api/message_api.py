@@ -1,7 +1,7 @@
 # smart_librarian/api/message_api.py
 from flask import Blueprint, request, jsonify,Response
 from smart_librarian.utils.auth_guard import current_user
-from smart_librarian.utils.message_helper import check_profanity,sanitize_ctx_messages
+from smart_librarian.utils.message_helper import check_profanity,sanitize_ctx_messages,to_b64
 from smart_librarian.models.chat_db import Conversation
 import json
 from uuid import uuid4
@@ -207,103 +207,23 @@ def api_send():
     MAX_TTS_CHARS = 1800
     tts_text = tts_text[:MAX_TTS_CHARS]
 
-    def _to_b64(maybe_bytes):
-        if not maybe_bytes:
-            return None
-        return base64.b64encode(maybe_bytes).decode("ascii")
+
 
     if tts_requested and tts_text:
-        # 1) Non-streaming without 'format' (your SDK complains about it)
-        try:
-            print("TTS: non-streaming attempt (no format)", flush=True)
-            r = client.audio.speech.create(
-                model="gpt-4o-mini-tts",
-                voice="alloy",
-                input=tts_text,
-            )
-            audio_bytes = None
-            if hasattr(r, "read"):
-                audio_bytes = r.read()
-            if audio_bytes is None:
-                audio_bytes = getattr(r, "content", None) or getattr(r, "data", None)
-            if audio_bytes is None:
-                audio_b64 = getattr(r, "audio", None)
-                if isinstance(audio_b64, str) and audio_b64.strip():
-                    tts_payload = {"audio_b64": audio_b64, "mime": "audio/mpeg", "voice": "aria"}
-            else:
-                tts_payload = {"audio_b64": _to_b64(audio_bytes), "mime": "audio/mpeg", "voice": "aria"}
+        resp = client.audio.speech.create(
+            model="gpt-4o-mini-tts",
+            voice="alloy",
+            input=tts_text,
+        )
 
-            if tts_payload:
-                print("TTS: non-streaming produced audio", flush=True)
-            else:
-                print("TTS: non-streaming returned nothing; trying response_format", flush=True)
-                raise RuntimeError("no_bytes_nonstream")
-        except Exception as e1:
-            print(f"TTS: non-streaming (no format) failed: {e1!r}", flush=True)
-            # 2) Non-streaming with 'response_format'
-            try:
-                print("TTS: non-streaming attempt (response_format='mp3')", flush=True)
-                r = client.audio.speech.create(
-                    model="gpt-4o-mini-tts",
-                    voice="aria",
-                    input=tts_text,
-                    response_format="mp3",
-                )
-                audio_bytes = None
-                if hasattr(r, "read"):
-                    audio_bytes = r.read()
-                if audio_bytes is None:
-                    audio_bytes = getattr(r, "content", None) or getattr(r, "data", None)
-                if audio_bytes is None:
-                    audio_b64 = getattr(r, "audio", None)
-                    if isinstance(audio_b64, str) and audio_b64.strip():
-                        tts_payload = {"audio_b64": audio_b64, "mime": "audio/mpeg", "voice": "aria"}
-                else:
-                    tts_payload = {"audio_b64": _to_b64(audio_bytes), "mime": "audio/mpeg", "voice": "aria"}
+        audio_bytes = resp.read()
+        audio_b64 = base64.b64encode(audio_bytes).decode("ascii")
 
-                if tts_payload:
-                    print("TTS: non-streaming (response_format) produced audio", flush=True)
-                else:
-                    print("TTS: still nothing; trying streaming", flush=True)
-                    raise RuntimeError("no_bytes_nonstream_2")
-            except Exception as e2:
-                print(f"TTS: non-streaming (response_format) failed: {e2!r}", flush=True)
-                # 3) Streaming to a temp file (most compatible)
-                try:
-                    print("TTS: streaming attempt to temp file", flush=True)
-                    with tempfile.NamedTemporaryFile(prefix="tts_", suffix=".mp3", delete=False) as tmp:
-                        tmp_path = tmp.name
-
-                    # Some SDKs accept 'format', others 'response_format'; try both
-                    try:
-                        with client.audio.speech.with_streaming_response.create(
-                            model="gpt-4o-mini-tts",
-                            voice="aria",
-                            input=tts_text,
-                            response_format="mp3",
-                        ) as resp:
-                            resp.stream_to_file(tmp_path)
-                    except TypeError:
-                        with client.audio.speech.with_streaming_response.create(
-                            model="gpt-4o-mini-tts",
-                            voice="aria",
-                            input=tts_text,
-                            format="mp3",
-                        ) as resp:
-                            resp.stream_to_file(tmp_path)
-
-                    with open(tmp_path, "rb") as f:
-                        audio_bytes = f.read()
-
-                    if audio_bytes:
-                        print(f"TTS: streaming bytes: {len(audio_bytes)}", flush=True)
-                        tts_payload = {"audio_b64": _to_b64(audio_bytes), "mime": "audio/mpeg", "voice": "aria"}
-                    else:
-                        print("TTS: streaming produced empty file", flush=True)
-                        tts_payload = {"error": "tts_failed_no_audio"}
-                except Exception as e3:
-                    print(f"TTS: streaming failed: {e3!r}", flush=True)
-                    tts_payload = {"error": "tts_exception", "detail": str(e3)}
+        tts_payload = {
+        "audio_b64": audio_b64,
+        "mime": "audio/mpeg",
+        "voice": "alloy",
+        }
     
     Conversation.add_message(user, conv_id, "assistant", assistant_response)
 

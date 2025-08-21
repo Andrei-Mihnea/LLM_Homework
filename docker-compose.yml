@@ -10,7 +10,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
     healthcheck:
       # no shell; simpler & portable
       test: ["CMD", "pg_isready", "-U", "smartlib", "-d", "smartlib"]

@@ -1,3 +1,5 @@
+
+
 def check_profanity(client,message:str) -> bool:
     resp = client.moderations.create(
         model="omni-moderation-latest",
@@ -11,6 +13,7 @@ def check_profanity(client,message:str) -> bool:
         print("⚠️ Message flagged:", categories)
     return flagged
 
+import base64
 import re
 
 def sanitize_ctx_messages(messages: list[dict]) -> list[dict]:
@@ -42,3 +45,8 @@ def sanitize_ctx_messages(messages: list[dict]) -> list[dict]:
         cleaned.append({"role": m["role"], "content": text.strip()})
 
     return cleaned
+
+def to_b64(maybe_bytes):
+    if not maybe_bytes:
+        return None
+    return base64.b64encode(maybe_bytes).decode("ascii")
