@@ -16,6 +16,7 @@ api_bp = Blueprint("api", __name__, url_prefix="/api")
 COOKIE_CONV = "current_conv_id"
 summaries = load_summaries()
 VECTORSTORE = build_vectorstore(summaries)
+GPT_MODEL="gpt-4o-mini"
 # print(summaries)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -164,16 +165,16 @@ def api_send():
     ctx_messages.append( {"role": "user", "content": user_msg})
 
     ai = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=GPT_MODEL,
         messages=ctx_messages,
         temperature=0.0,
         tools=tools,
         tool_choice="auto"
 
     )
-
+    assistant_response = ""
     assistant_response_raw = ai.choices[0].message
-    assistant_response = assistant_response_raw.content or ""
+    text_response = assistant_response_raw.content or ""
     # print(tool_raw_reply.content)
     print(assistant_response_raw)
     # print(first.output)
@@ -194,24 +195,44 @@ def api_send():
             title = (args.get("title") or "").strip()
             if title:
                 summary_text = get_summary_by_title(title)
-                assistant_response += f"\n\n „{title}”\n{summary_text}"
+                text_response += f"\n\n „{title}”\n{summary_text}"
             break
     
-    # ---------- TTS ----------
+
     tts_payload = None
     tts_requested = bool(data.get("tts_enable"))
     print(f"tts_requested = {tts_requested}", flush=True)
-
-    # Speak full summary if present; else speak assistant reply
-    tts_text = (summary_text.strip() or (assistant_response or "").strip())
+    
+    
+    tts_text = (summary_text.strip() or (text_response or "").strip())
     MAX_TTS_CHARS = 1800
     tts_text = tts_text[:MAX_TTS_CHARS]
 
+    image_payload = None
+    image_generation_requested = bool(data.get("image_enable"))
+    image_generation_text = (text_response or "").strip()
 
+    if image_generation_requested and image_generation_text:
+        try:
+            # Use the Images API to get a base64 PNG (compact & predictable)
+            img = client.images.generate(
+                model="gpt-image-1",
+                prompt=image_generation_text,
+                size="1024x1024"
+            )
+            image_b64 = img.data[0].b64_json  # <-- base64 PNG string
+
+            # Embed into the assistant content so it persists in history
+            text_response += f"<image type=\"image/png\">{image_b64}</image>"
+        except Exception as e:
+            # Optional: add a small notice in the text; or ignore silently
+            text_response += "\n\n[Image generation failed]"
+        
+    assistant_response += text_response
 
     if tts_requested and tts_text:
         resp = client.audio.speech.create(
-            model="gpt-4o-mini-tts",
+            model=GPT_MODEL+"-tts",
             voice="alloy",
             input=tts_text,
         )

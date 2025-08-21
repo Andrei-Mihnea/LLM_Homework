@@ -37,7 +37,7 @@
     .logout-btn{padding:6px 10px;border-radius:8px;background:#2a1216;color:#ffb3c0;text-decoration:none;font-weight:600;border:1px solid var(--border)}
     .area{flex:1;min-height:0;position:relative;background:#0d1015}
     .inner{position:absolute;inset:0 0 64px 0;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
-    .bubble{max-width:min(75%,820px);padding:10px 12px;border-radius:14px;border:1px solid var(--border);line-height:1.5;white-space:pre-wrap;word-wrap:break-word}
+    .bubble{max-width:min(75%,820px);padding:10px 12px;border-radius:14px;border:1px solid var(--border);line-height:1.5;white-space:pre-wrap;word-wrap:break-word;color:var(--text)}
     .user{align-self:flex-end;background:#0e1116}
     .assistant{align-self:flex-start;background:#141a23}
     .meta{font-size:12px;color:var(--muted);margin:4px 2px}
@@ -45,7 +45,7 @@
     form.chat{display:flex;gap:8px;align-items:flex-end;max-width:1200px;margin:0 auto}
     .field{flex:1;display:flex;flex-direction:column;gap:6px}
     .field label{font-size:12px;color:var(--muted)}
-    input[type="text"]{flex:1;background:#0e1116;border:1px solid var(--border);border-radius:10px;color:#0b0d10;padding:12px}
+    input[type="text"]{flex:1;background:#0e1116;border:1px solid var(--border);border-radius:10px;color:var(--text);padding:12px}
     .actions{display:flex;gap:10px;align-items:center}
     button.send{padding:12px 14px;border-radius:10px;border:0;background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#0b0d10;font-weight:800;cursor:pointer;white-space:nowrap}
     .welcome{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px}
@@ -59,19 +59,33 @@
     /* Ephemeral & warning */
     .bubble.ephemeral{opacity:.95;border-style:dashed}
     .bubble.warning{border-color:rgba(255,123,148,.45);box-shadow:0 0 0 1px rgba(255,123,148,.1) inset}
-    .bubble.ephemeral::after{content:"  (not saved)";font-size:11px;color:var(--muted);margin-left:6px;opacity:.85}
 
-    /* TTS toggle */
-    .tts-toggle{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:#0e1116}
-    .tts-toggle input{margin:0}
-    .tts-toggle span{font-size:12px;color:var(--muted)}
-
-    /* Audio bubble */
+    /* Audio bubble UI */
     .audio-bubble{display:flex;align-items:center;gap:12px}
     .audio-btn{width:38px;height:38px;border-radius:50%;border:0;background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#0b0d10;font-weight:800;cursor:pointer}
     .audio-timeline{flex:1;height:8px;border-radius:999px;background:#1b2230;position:relative;overflow:hidden;cursor:pointer}
     .audio-progress{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent3)}
     .audio-time{font-size:12px;color:var(--muted);min-width:72px;text-align:right}
+
+    /* Options popup */
+    .options{ position: relative; }
+    .options-btn{
+      padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+      background:#121720;color:var(--text);cursor:pointer;font-weight:600
+    }
+    .options-panel{
+      position:absolute; right:0; bottom:48px;
+      background:#0e1116; border:1px solid var(--border); border-radius:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,.4);
+      padding:10px; display:none; min-width:220px; z-index:10;
+    }
+    .options-panel.open{ display:block; }
+    .opt-row{ display:flex; align-items:center; gap:10px; padding:8px 6px; }
+    .opt-row input{ margin:0; }
+    .opt-row label{ color:var(--text); font-size:14px; cursor:pointer; }
+    .opt-help{ font-size:12px; color:var(--muted); padding:6px 6px 0; }
+    /* Image in bubbles */
+    .assistant img{max-width:100%; border-radius:10px; display:block}
   </style>
 </head>
 <body>
@@ -117,11 +131,23 @@
             <input id="message" type="text" name="message" placeholder="Ask for cozy fantasy with found family..." required />
           </div>
           <div class="actions">
-            <!-- Send the flag your backend expects: tts_enable -->
-            <label class="tts-toggle" title="Generate an audio version of the assistant's reply">
-              <input id="ttsToggle" type="checkbox" />
-              <span>Audio reply</span>
-            </label>
+
+            <!-- Options popup -->
+            <div class="options">
+              <button class="options-btn" type="button" id="optionsBtn">Options ▾</button>
+              <div class="options-panel" id="optionsPanel">
+                <div class="opt-row">
+                  <input id="ttsToggle" type="checkbox" />
+                  <label for="ttsToggle">Audio reply</label>
+                </div>
+                <div class="opt-row">
+                  <input id="imgToggle" type="checkbox" />
+                  <label for="imgToggle">Image generation</label>
+                </div>
+                <div class="opt-help">These settings will be sent with your message.</div>
+              </div>
+            </div>
+
             <button class="send" type="submit">Send</button>
           </div>
         </form>
@@ -134,7 +160,12 @@
     const messagesEl = document.getElementById('messages');
     const chatTitle = document.getElementById('chatTitle');
     const newBtn = document.getElementById('newChatBtn');
-    const ttsToggle = document.getElementById('ttsToggle');
+
+    // Options elements
+    const optionsBtn   = document.getElementById('optionsBtn');
+    const optionsPanel = document.getElementById('optionsPanel');
+    const ttsToggle    = document.getElementById('ttsToggle');
+    const imgToggle    = document.getElementById('imgToggle');
 
     let currentConvId = null;
 
@@ -148,17 +179,16 @@
     function scrollToBottom(){ messagesEl.scrollTop = messagesEl.scrollHeight; }
     function fmtTime(s){ s = Math.max(0, s|0); const m=(s/60)|0; const r=(s%60)|0; return `${m}:${r.toString().padStart(2,'0')}`; }
 
-    // client-side sanitization to hide accidental <audio>…</audio> and huge base64 strings from display
+    // client-side sanitization to hide accidental <audio> / <image> tags and huge base64 from text
     function sanitizeForDisplay(text){
       if (typeof text !== 'string') return text;
-      // strip <audio>…</audio> (we'll extract/handle them separately)
-      text = text.replace(/<audio>.*?<\/audio>/gis, '');
-      // replace suspiciously long base64-looking chunks
-      text = text.replace(/[A-Za-z0-9+/=]{100,}/g, '[audio removed]');
+      text = text.replace(/<audio.*?<\/audio>/gis, ''); // handled separately
+      text = text.replace(/<image.*?<\/image>/gis, ''); // handled separately
+      text = text.replace(/[A-Za-z0-9+/=]{100,}/g, '[media removed]');
       return text.trim();
     }
 
-    // Extracts <audio ...>BASE64</audio> and returns { cleanText, audios: [{ b64, mime }] }
+    // Extract <audio type="...">BASE64</audio>
     function extractAudioTags(text){
       if (typeof text !== 'string' || !text) return { cleanText: text || '', audios: [] };
       const audios = [];
@@ -167,9 +197,31 @@
         const mime = (mimeAttr && mimeAttr.trim()) || 'audio/mpeg';
         const payload = (b64 || '').trim();
         if (payload) audios.push({ b64: payload, mime });
-        return ''; // remove the tag from visible text
+        return '';
       });
       return { cleanText, audios };
+    }
+
+    // Extract <image type="...">BASE64</image>
+    function extractImageTags(text){
+      if (typeof text !== 'string' || !text) return { cleanText: text || '', images: [] };
+      const images = [];
+      const re = /<image(?:\s+[^>]*?type=["']([^"']+)["'][^>]*)?>([\sA-Za-z0-9+/=]+)<\/image>/gi;
+      const cleanText = text.replace(re, (_, mimeAttr, b64) => {
+        const mime = (mimeAttr && mimeAttr.trim()) || 'image/png';
+        const payload = (b64 || '').trim();
+        if (payload) images.push({ b64: payload, mime });
+        return '';
+      });
+      return { cleanText, images };
+    }
+
+    function b64ToBlob(b64, mime='application/octet-stream'){
+      const bin = atob(b64);
+      const len = bin.length;
+      const bytes = new Uint8Array(len);
+      for (let i=0;i<len;i++) bytes[i] = bin.charCodeAt(i);
+      return new Blob([bytes], {type: mime});
     }
 
     /* ---------- list & conversations ---------- */
@@ -228,34 +280,63 @@
       list.forEach((m, i) => {
         const meta = el('div', {class:'meta'}, `${i+1} · ${m.role}`);
 
-        // 1) Extract audio tags from message content
+        // Extract media tags first (image, then audio) so we can sanitize the text
         const rawText = (m && m.content) ? String(m.content) : '';
-        const { cleanText, audios } = extractAudioTags(rawText);
+        const imgRes = extractImageTags(rawText);
+        const audRes = extractAudioTags(imgRes.cleanText);
 
-        // 2) Show cleaned text
+        // Show cleaned text
         const bubble = el('div', {class:`bubble ${m.role === 'user' ? 'user' : 'assistant'}`});
-        bubble.textContent = sanitizeForDisplay(cleanText);
+        bubble.textContent = sanitizeForDisplay(audRes.cleanText);
         messagesEl.appendChild(meta);
         messagesEl.appendChild(bubble);
 
-        // 3) Render audio bubbles from extracted tags
-        if (Array.isArray(audios) && audios.length){
-          audios.forEach(({ b64, mime }) => {
+        // Render images
+        if (Array.isArray(imgRes.images) && imgRes.images.length){
+          imgRes.images.forEach(({ b64, mime }) => {
+            if (!b64) return;
+            const blob = b64ToBlob(b64, mime || 'image/png');
+            const url = URL.createObjectURL(blob);
+            const metaImg = el('div', {class:'meta'}, `assistant (image)`);
+            const wrap = el('div', {class:'bubble assistant'});
+            const img = new Image();
+            img.src = url;
+            img.alt = 'Generated image';
+            img.style.maxWidth = '100%';
+            img.style.borderRadius = '10px';
+            wrap.appendChild(img);
+            messagesEl.appendChild(metaImg);
+            messagesEl.appendChild(wrap);
+          });
+        }
+
+        // Render audio bubbles
+        if (Array.isArray(audRes.audios) && audRes.audios.length){
+          audRes.audios.forEach(({ b64, mime }) => {
             if (!b64) return;
             const blob = b64ToBlob(b64, mime || 'audio/mpeg');
             createAudioBubbleFromBlob(blob, '');
           });
         }
 
-        // 4) (Optional) If you ever add persisted attachments too
+        // (Optional) attachments array support if you add it later
         const attachments = Array.isArray(m.attachments) ? m.attachments : [];
         attachments.forEach(att => {
-          const isAudio = (att.type === 'audio') || ('audio_b64' in att) || ('b64' in att);
-          if (!isAudio) return;
-          const audioB64 = att.audio_b64 || att.b64;
-          if (!audioB64) return;
-          const blob = b64ToBlob(audioB64, att.mime || 'audio/mpeg');
-          createAudioBubbleFromBlob(blob, att.voice || '');
+          if (att.type === 'audio' && (att.audio_b64 || att.b64)){
+            const blob = b64ToBlob(att.audio_b64 || att.b64, att.mime || 'audio/mpeg');
+            createAudioBubbleFromBlob(blob, att.voice || '');
+          }
+          if (att.type === 'image' && (att.image_b64 || att.b64)){
+            const blob = b64ToBlob(att.image_b64 || att.b64, att.mime || 'image/png');
+            const url = URL.createObjectURL(blob);
+            const metaImg = el('div', {class:'meta'}, `assistant (image)`);
+            const wrap = el('div', {class:'bubble assistant'});
+            const img = new Image();
+            img.src = url; img.alt = 'Image'; img.style.maxWidth = '100%'; img.style.borderRadius = '10px';
+            wrap.appendChild(img);
+            messagesEl.appendChild(metaImg);
+            messagesEl.appendChild(wrap);
+          }
         });
       });
 
@@ -282,6 +363,17 @@
       const data = await r.json();
       await loadList();
       await openConv(data.conv.id);
+    });
+
+    /* ---------- Options popup events ---------- */
+    optionsBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      optionsPanel.classList.toggle('open');
+    });
+    document.addEventListener('click', (e) => {
+      if (!optionsPanel) return;
+      const within = optionsPanel.contains(e.target) || optionsBtn.contains(e.target);
+      if (!within) optionsPanel.classList.remove('open');
     });
 
     /* ---------- Audio bubble UI (play/pause, progress, seek) ---------- */
@@ -354,14 +446,6 @@
       scrollToBottom();
     }
 
-    function b64ToBlob(b64, mime='audio/mpeg'){
-      const bin = atob(b64);
-      const len = bin.length;
-      const bytes = new Uint8Array(len);
-      for (let i=0;i<len;i++) bytes[i] = bin.charCodeAt(i);
-      return new Blob([bytes], {type: mime});
-    }
-
     /* ---------- send message ---------- */
     const form = document.getElementById('chatForm');
     form.addEventListener('submit', async (e) => {
@@ -388,7 +472,8 @@
         body: JSON.stringify({
           message: text,
           conv_id: currentConvId,
-          tts_enable: ttsToggle.checked   // 👈 exactly what your backend reads
+          tts_enable: !!(ttsToggle && ttsToggle.checked),
+          image_enable: !!(imgToggle && imgToggle.checked)
         })
       });
       const isJSON = (res.headers.get('content-type') || '').includes('application/json');
@@ -405,10 +490,10 @@
       if (data.error) return;
       currentConvId = data.conv.id;
 
-      // Re-render messages to stay in sync with server history
+      // Re-render from server history (includes any <audio> and <image> tags you persisted)
       renderMessages(data.messages || []);
 
-      // If server flagged profanity, show ephemeral user message + warning
+      // Profanity flow (unchanged)
       if (data.profanity_warning) {
         const metaUser = document.createElement('div');
         metaUser.className = 'meta';
@@ -434,10 +519,7 @@
         return;
       }
 
-      // We no longer render audio directly from `data.tts` to avoid duplicates.
-      // The audio is already in the saved message content as <audio>...</audio>
-      // and `renderMessages` will rebuild the audio bubble from history.
-
+      // Keep sidebar list fresh
       await loadList();
     });
 
