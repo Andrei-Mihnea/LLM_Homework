@@ -11,6 +11,7 @@ import os
 from smart_librarian.models.book_model import load_summaries, build_vectorstore,get_summary_by_title,titles
 import base64
 import io
+import openai
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
 COOKIE_CONV = "current_conv_id"
@@ -286,3 +287,35 @@ Be strict about sources. Friendly tone, but accuracy first.
     })
     resp_json.set_cookie(COOKIE_CONV, str(conv_id), httponly=True, samesite="Strict")
     return resp_json
+
+@api_bp.post("/stt")
+def stt():
+    f = request.files.get("audio")
+    if not f:
+        return jsonify({"error": "no_audio"}), 400
+
+    language = request.form.get("language")
+    prompt   = request.form.get("prompt")
+
+    args = {
+        "model": GPT_MODEL + "-transcribe",  # e.g. gpt-4o-mini-transcribe
+        "file": (f.filename, f.stream, f.mimetype or "application/octet-stream"),
+    }
+    if language: args["language"] = language
+    if prompt:   args["prompt"]   = prompt
+
+    try:
+        tr = client.audio.transcriptions.create(**args)
+    except openai.BadRequestError as e:
+        msg = str(e)
+        # Detect the short-audio case and return a helpful response
+        if "audio duration" in msg and "minimum" in msg:
+            return jsonify({
+                "error": "too_short",
+                "message": "Recording too short. Please record at least 0.3–0.5 seconds."
+            }), 422
+        # Bubble up any other request issue
+        return jsonify({"error": "bad_request", "message": msg}), 400
+
+    text = getattr(tr, "text", None) or (tr.get("text") if isinstance(tr, dict) else None)
+    return jsonify({"text": text or ""})
