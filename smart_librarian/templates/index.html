@@ -84,8 +84,27 @@
     .opt-row input{ margin:0; }
     .opt-row label{ color:var(--text); font-size:14px; cursor:pointer; }
     .opt-help{ font-size:12px; color:var(--muted); padding:6px 6px 0; }
+
     /* Image in bubbles */
     .assistant img{max-width:100%; border-radius:10px; display:block}
+
+    /* ---------------- Typing / thinking bubble ---------------- */
+    .bubble.typing{
+      display:inline-flex; align-items:center; gap:8px;
+      background:#141a23; opacity:.95
+    }
+    .dots{display:inline-flex; gap:6px; align-items:center}
+    .dot{
+      width:8px; height:8px; border-radius:50%;
+      background:var(--accent1); opacity:.25;
+      animation:blink 1.2s infinite ease-in-out;
+    }
+    .dot:nth-child(2){animation-delay:.15s}
+    .dot:nth-child(3){animation-delay:.3s}
+    @keyframes blink{
+      0%,80%,100%{opacity:.25; transform:translateY(0)}
+      40%{opacity:1; transform:translateY(-2px)}
+    }
   </style>
 </head>
 <body>
@@ -222,6 +241,28 @@
       const bytes = new Uint8Array(len);
       for (let i=0;i<len;i++) bytes[i] = bin.charCodeAt(i);
       return new Blob([bytes], {type: mime});
+    }
+
+    /* ---------- typing / thinking helper ---------- */
+    function showAssistantThinking(label='assistant'){
+      const meta = el('div', {class:'meta'}, `${label} (typing)`);
+      const bubble = el('div', {class:'bubble assistant typing', role:'status', 'aria-live':'polite'});
+      const inner = el('div', {class:'dots', 'aria-label':'Assistant is typing'});
+      inner.appendChild(el('span', {class:'dot'}));
+      inner.appendChild(el('span', {class:'dot'}));
+      inner.appendChild(el('span', {class:'dot'}));
+      bubble.appendChild(inner);
+
+      messagesEl.appendChild(meta);
+      messagesEl.appendChild(bubble);
+      scrollToBottom();
+
+      return {
+        remove(){
+          if (meta.parentNode) meta.parentNode.removeChild(meta);
+          if (bubble.parentNode) bubble.parentNode.removeChild(bubble);
+        }
+      };
     }
 
     /* ---------- list & conversations ---------- */
@@ -466,61 +507,79 @@
       scrollToBottom();
       input.value = '';
 
-      const res = await fetch('/api/send', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          message: text,
-          conv_id: currentConvId,
-          tts_enable: !!(ttsToggle && ttsToggle.checked),
-          image_enable: !!(imgToggle && imgToggle.checked)
-        })
-      });
-      const isJSON = (res.headers.get('content-type') || '').includes('application/json');
-      if (!res.ok || !isJSON){
+      // show typing placeholder while waiting for server
+      const typing = showAssistantThinking();
+
+      try {
+        const res = await fetch('/api/send', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            message: text,
+            conv_id: currentConvId,
+            tts_enable: !!(ttsToggle && ttsToggle.checked),
+            image_enable: !!(imgToggle && imgToggle.checked)
+          })
+        });
+
+        const isJSON = (res.headers.get('content-type') || '').includes('application/json');
+
+        if (!res.ok || !isJSON){
+          typing.remove();
+          const errDiv = document.createElement('div');
+          errDiv.className = 'bubble assistant warning ephemeral';
+          errDiv.style.borderColor = 'rgba(255,0,0,.3)';
+          errDiv.textContent = 'Failed to send. Please try again.';
+          messagesEl.appendChild(errDiv);
+          return;
+        }
+
+        const data = await res.json();
+        typing.remove();
+
+        if (data.error) return;
+
+        currentConvId = data.conv.id;
+
+        // Re-render from server history (includes any <audio> and <image> tags you persisted)
+        renderMessages(data.messages || []);
+
+        // Profanity flow
+        if (data.profanity_warning) {
+          // typing bubble already removed above
+          const metaUser = document.createElement('div');
+          metaUser.className = 'meta';
+          metaUser.textContent = 'you (not saved)';
+          const bubbleUser = document.createElement('div');
+          bubbleUser.className = 'bubble user ephemeral';
+          bubbleUser.textContent = data.ephemeral_user_message || '';
+          messagesEl.appendChild(metaUser);
+          messagesEl.appendChild(bubbleUser);
+
+          const metaWarn = document.createElement('div');
+          metaWarn.className = 'meta';
+          metaWarn.textContent = 'assistant (warning)';
+          const bubbleWarn = document.createElement('div');
+          bubbleWarn.className = 'bubble assistant warning ephemeral';
+          bubbleWarn.setAttribute('role','alert');
+          bubbleWarn.textContent = data.profanity_warning;
+          messagesEl.appendChild(metaWarn);
+          messagesEl.appendChild(bubbleWarn);
+
+          scrollToBottom();
+          await loadList();
+          return;
+        }
+
+        // Keep sidebar list fresh
+        await loadList();
+      } catch (err) {
+        typing.remove();
         const errDiv = document.createElement('div');
         errDiv.className = 'bubble assistant warning ephemeral';
-        errDiv.style.borderColor = 'rgba(255,0,0,.3)';
-        errDiv.textContent = 'Failed to send. Please try again.';
+        errDiv.textContent = 'Network error. Please check your connection and try again.';
         messagesEl.appendChild(errDiv);
-        return;
       }
-
-      const data = await res.json();
-      if (data.error) return;
-      currentConvId = data.conv.id;
-
-      // Re-render from server history (includes any <audio> and <image> tags you persisted)
-      renderMessages(data.messages || []);
-
-      // Profanity flow (unchanged)
-      if (data.profanity_warning) {
-        const metaUser = document.createElement('div');
-        metaUser.className = 'meta';
-        metaUser.textContent = 'you (not saved)';
-        const bubbleUser = document.createElement('div');
-        bubbleUser.className = 'bubble user ephemeral';
-        bubbleUser.textContent = data.ephemeral_user_message || '';
-        messagesEl.appendChild(metaUser);
-        messagesEl.appendChild(bubbleUser);
-
-        const metaWarn = document.createElement('div');
-        metaWarn.className = 'meta';
-        metaWarn.textContent = 'assistant (warning)';
-        const bubbleWarn = document.createElement('div');
-        bubbleWarn.className = 'bubble assistant warning ephemeral';
-        bubbleWarn.setAttribute('role','alert');
-        bubbleWarn.textContent = data.profanity_warning;
-        messagesEl.appendChild(metaWarn);
-        messagesEl.appendChild(bubbleWarn);
-
-        scrollToBottom();
-        await loadList();
-        return;
-      }
-
-      // Keep sidebar list fresh
-      await loadList();
     });
 
     /* ---------- boot ---------- */
@@ -539,15 +598,15 @@
       if (!sidebar) return;
       if (open){
         sidebar.classList.add('open');
-        backdrop && backdrop.classList.add('show');
+        if (backdrop) backdrop.classList.add('show');
       } else {
         sidebar.classList.remove('open');
-        backdrop && backdrop.classList.remove('show');
+        if (backdrop) backdrop.classList.remove('show');
       }
     }
-    openSide && openSide.addEventListener('click', () => toggleSide(true));
-    closeSide && closeSide.addEventListener('click', () => toggleSide(false));
-    backdrop && backdrop.addEventListener('click', () => toggleSide(false));
+    if (openSide) openSide.addEventListener('click', () => toggleSide(true));
+    if (closeSide) closeSide.addEventListener('click', () => toggleSide(false));
+    if (backdrop) backdrop.addEventListener('click', () => toggleSide(false));
   </script>
 </body>
 </html>

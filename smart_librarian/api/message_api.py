@@ -217,7 +217,7 @@ def api_send():
             # Use the Images API to get a base64 PNG (compact & predictable)
             img = client.images.generate(
                 model="gpt-image-1",
-                prompt=image_generation_text,
+                prompt=f"Generate an image where you expose the action from this summary(with the characters or the action mentioned):\n{image_generation_text}\nHard rules!!:\nDon't add text except for the title",
                 size="1024x1024"
             )
             image_b64 = img.data[0].b64_json  # <-- base64 PNG string
