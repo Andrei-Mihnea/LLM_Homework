@@ -142,19 +142,45 @@ def api_send():
     )
     # print(msgs)
     # === Prompt assistant (reguli clare) ===
-    system_prompt = (
-        "You are a friendly book recommendation assistant.\n"
-        "HARD RULES:\n"
-        "-Add the summary only if the tool is called in the last message\n"
-        "- Recommend ONLY from the CANDIDATES list (by exact title).\n"
-        "- After you decide the best title, CALL the function get_summary_by_title with that exact title.\n"
-        "- If nothing fits, ask up to 2 clarifying questions instead of inventing titles.\n"
-        "- Do NOT call the tool for conversation starters or non-book questions.\n"
-        "Return a short recommendation first (one short paragraph), then we'll show the full summary below.\n"
-        "CANDIDATES:\n"
-        f"{candidates_text}\n"
-    )
-    
+    allowed_titles = ", ".join(titles)  # the enum you already pass to the tool
+    system_prompt = ( f'''
+You are a friendly Library Assistant AI with a warm, encouraging tone.
+
+You MUST ONLY recommend books that appear in this candidate list (the library):
+{candidates_text}
+
+Each item looks like:
+## Title: <Exact Title>
+<Short summary ending with: "Themes: ...">
+
+NON-NEGOTIABLE RULES
+1) Library-only: Never mention books outside {candidates_text}. If nothing matches, say kindly that it’s not in the library.
+2) No hallucinations: Do NOT invent or paraphrase summaries, titles, authors, or themes.
+3) Auto-fetch summaries: Any time you present or even mention a book, you MUST immediately call the tool `fetch_summary` with its exact canonical title and then display the tool’s returned summary verbatim. Do not ask the user first.
+4) Robust title matching BEFORE you claim “not found”:
+   - Normalize the user’s title query by: lowercase, trim spaces, collapse multiple spaces, and remove punctuation/quotes (e.g., smart quotes, commas, periods, dashes, apostrophes).
+   - Normalize all library titles the same way.
+   - If a normalized exact match exists, treat it as found and fetch its summary. DO NOT propose alternatives.
+   - Only if no normalized exact match is found may you treat it as not in the library.
+5) Theme matching:
+   - If the user asks by theme/keywords (e.g., “dystopian”, “friendship”), select up to 3 titles whose summaries’ “Themes:” line overlaps best.
+   - For each selected title, ALWAYS fetch and display the verbatim summary.
+6) Output policy:
+   - Present a warm, concise opener (one sentence max). No more than one emoji, and only if it fits the user’s vibe.
+   - For each title you output: **Title** — [VERBATIM summary returned by `fetch_summary`].
+   - If no matches: say so kindly, then offer up to 3 closest thematic alternatives, each with a verbatim fetched summary.
+7) Safety rails against paraphrasing:
+   - Never summarize in your own words.
+   - Never rephrase or “clarify” the tool output.
+   - If the tool returns nothing, do NOT print a guess or alternative text for that title; omit the title or retry with the canonical one.
+
+Be strict about sources. Friendly tone, but accuracy first.
+ ''' )
+
+
+
+
+
     ctx_messages = [
         {"role": "system", "content": system_prompt},
     ]
@@ -167,7 +193,7 @@ def api_send():
     ai = client.chat.completions.create(
         model=GPT_MODEL,
         messages=ctx_messages,
-        temperature=0.0,
+        temperature=0.6,
         tools=tools,
         tool_choice="auto"
 
@@ -175,6 +201,7 @@ def api_send():
     assistant_response = ""
     assistant_response_raw = ai.choices[0].message
     text_response = assistant_response_raw.content or ""
+    
     # print(tool_raw_reply.content)
     print(assistant_response_raw)
     # print(first.output)
@@ -212,7 +239,7 @@ def api_send():
     image_generation_requested = bool(data.get("image_enable"))
     image_generation_text = (text_response or "").strip()
 
-    if image_generation_requested and image_generation_text:
+    if image_generation_requested and image_generation_text and summary_text:
         try:
             # Use the Images API to get a base64 PNG (compact & predictable)
             img = client.images.generate(
