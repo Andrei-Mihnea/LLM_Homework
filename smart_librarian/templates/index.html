@@ -45,7 +45,7 @@
     form.chat{display:flex;gap:8px;align-items:flex-end;max-width:1200px;margin:0 auto}
     .field{flex:1;display:flex;flex-direction:column;gap:6px}
     .field label{font-size:12px;color:var(--muted)}
-    input[type="text"]{flex:1;background:#0e1116;border:1px solid var(--border);border-radius:10px;color:var(--text);padding:12px}
+    input[type="text"]{flex:1;background:#0e1116;border:1px solid var(--border);border-radius:10px;color:#e8edf2;padding:12px}
     .actions{display:flex;gap:10px;align-items:center}
     button.send{padding:12px 14px;border-radius:10px;border:0;background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#0b0d10;font-weight:800;cursor:pointer;white-space:nowrap}
     .mic-wrap{display:flex;align-items:center;gap:8px}
@@ -71,12 +71,12 @@
 
     /* Options popup */
     .options{ position: relative; }
-    .options-btn{ padding:10px 12px;border-radius:10px;border:1px solid var(--border); background:#121720;color:var(--text);cursor:pointer;font-weight:600 }
+    .options-btn{ padding:10px 12px;border-radius:10px;border:1px solid var(--border); background:#121720;color:#e8edf2;cursor:pointer;font-weight:600 }
     .options-panel{ position:absolute; right:0; bottom:48px; background:#0e1116; border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.4); padding:10px; display:none; min-width:220px; z-index:10; }
     .options-panel.open{ display:block; }
     .opt-row{ display:flex; align-items:center; gap:10px; padding:8px 6px; }
     .opt-row input{ margin:0; }
-    .opt-row label{ color:var(--text); font-size:14px; cursor:pointer; }
+    .opt-row label{ color:#e8edf2; font-size:14px; cursor:pointer; }
     .opt-help{ font-size:12px; color:var(--muted); padding:6px 6px 0; }
 
     /* Image in bubbles */
@@ -89,6 +89,19 @@
     .dot:nth-child(2){animation-delay:.15s}
     .dot:nth-child(3){animation-delay:.3s}
     @keyframes blink{0%,80%,100%{opacity:.25; transform:translateY(0)}40%{opacity:1; transform:translateY(-2px)}}
+
+    /* ===== Recording Overlay & Visualizer ===== */
+    .rec-overlay{position:fixed;inset:0;background:rgba(4,6,9,.55);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:999}
+    .rec-overlay.show{display:flex}
+    .rec-card{width:min(560px,92vw);border:1px solid var(--border);border-radius:18px;background:#0e1116;box-shadow:0 20px 60px rgba(0,0,0,.55);padding:24px;text-align:center}
+    .pulse-wrap{position:relative;width:120px;height:120px;margin:0 auto 14px}
+    .pulse-wrap:before,.pulse-wrap:after{content:"";position:absolute;inset:-8px;border-radius:999px;background:radial-gradient(closest-side,rgba(124,153,255,.25),transparent 70%);animation:pulseRing 1.8s ease-in-out infinite}
+    .pulse-wrap:after{animation-delay:.9s}
+    @keyframes pulseRing{0%{opacity:.0;transform:scale(.8)}50%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(1.25)}}
+    .mic-blob{position:absolute;inset:0;margin:auto;display:flex;align-items:center;justify-content:center;width:120px;height:120px;border-radius:999px;background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#0b0d10;font-size:44px;font-weight:900;box-shadow:0 6px 22px rgba(124,153,255,.35);transition:transform .08s linear}
+    .vu{display:flex;gap:6px;align-items:flex-end;justify-content:center;height:56px;margin:16px 0 10px}
+    .vu-bar{width:10px;height:6%;border-radius:6px;background:linear-gradient(180deg,var(--accent3),var(--accent1));opacity:.9;box-shadow:0 1px 8px rgba(82,230,185,.2)}
+    .rec-help{color:var(--muted);margin-bottom:10px}
   </style>
 </head>
 <body>
@@ -163,6 +176,20 @@
     </main>
   </div>
 
+  <!-- Recording overlay -->
+  <div class="rec-overlay" id="recOverlay" aria-live="polite" aria-label="Recording">
+    <div class="rec-card">
+      <div class="pulse-wrap"><div class="mic-blob" id="micBlob">🎤</div></div>
+      <div class="vu" id="vu">
+        <span class="vu-bar"></span><span class="vu-bar"></span><span class="vu-bar"></span><span class="vu-bar"></span>
+        <span class="vu-bar"></span><span class="vu-bar"></span><span class="vu-bar"></span><span class="vu-bar"></span>
+        <span class="vu-bar"></span><span class="vu-bar"></span><span class="vu-bar"></span><span class="vu-bar"></span>
+      </div>
+      <div class="rec-help">Recording… click the mic again or press Stop to finish</div>
+      <button type="button" class="send" id="stopRecBtn">Stop</button>
+    </div>
+  </div>
+
   <script>
     const convList = document.getElementById('convList');
     const messagesEl = document.getElementById('messages');
@@ -190,35 +217,33 @@
     // client-side sanitization to hide accidental <audio> / <image> tags and huge base64 from text
     function sanitizeForDisplay(text){
       if (typeof text !== 'string') return text;
-      text = text.replace(/<audio.*?<\/audio>/gis, ''); // handled separately
-      text = text.replace(/<image.*?<\/image>/gis, ''); // handled separately
+      text = text.replace(/<audio[\s\S]*?<\/audio>/gi, ''); // handled separately
+      text = text.replace(/<image[\s\S]*?<\/image>/gi, ''); // handled separately
       text = text.replace(/[A-Za-z0-9+/=]{100,}/g, '[media removed]');
       return text.trim();
     }
 
-    // Extract <audio type="...">BASE64</audio>
+    // Extract <audio>BASE64</audio>
     function extractAudioTags(text){
       if (typeof text !== 'string' || !text) return { cleanText: text || '', audios: [] };
       const audios = [];
-      const re = /<audio(?:\s+[^>]*?type=["']([^"']+)["'][^>]*)?>([\s[A-Za-z0-9+/=]+)<\/audio>/gi;
-      const cleanText = text.replace(re, (_, mimeAttr, b64) => {
-        const mime = (mimeAttr && mimeAttr.trim()) || 'audio/mpeg';
-        const payload = (b64 || '').trim();
-        if (payload) audios.push({ b64: payload, mime });
+      const re = /<audio[^>]*?>([\s\S]*?)<\/audio>/gi;
+      const cleanText = text.replace(re, (_, b64) => {
+        const payload = (b64 || '').replace(/\s+/g, '').trim();
+        if (payload) audios.push({ b64: payload, mime: 'audio/mpeg' });
         return '';
       });
       return { cleanText, audios };
     }
 
-    // Extract <image type="...">BASE64</image>
+    // Extract <image>BASE64</image>
     function extractImageTags(text){
       if (typeof text !== 'string' || !text) return { cleanText: text || '', images: [] };
       const images = [];
-      const re = /<image(?:\s+[^>]*?type=["']([^"']+)["'][^>]*)?>([\sA-Za-z0-9+/=]+)<\/image>/gi;
-      const cleanText = text.replace(re, (_, mimeAttr, b64) => {
-        const mime = (mimeAttr && mimeAttr.trim()) || 'image/png';
-        const payload = (b64 || '').trim();
-        if (payload) images.push({ b64: payload, mime });
+      const re = /<image[^>]*?>([\s\S]*?)<\/image>/gi;
+      const cleanText = text.replace(re, (_, b64) => {
+        const payload = (b64 || '').replace(/\s+/g, '').trim();
+        if (payload) images.push({ b64: payload, mime: 'image/png' });
         return '';
       });
       return { cleanText, images };
@@ -332,25 +357,6 @@
             createAudioBubbleFromBlob(blob, '');
           });
         }
-
-        const attachments = Array.isArray(m.attachments) ? m.attachments : [];
-        attachments.forEach(att => {
-          if (att.type === 'audio' && (att.audio_b64 || att.b64)){
-            const blob = b64ToBlob(att.audio_b64 || att.b64, att.mime || 'audio/mpeg');
-            createAudioBubbleFromBlob(blob, att.voice || '');
-          }
-          if (att.type === 'image' && (att.image_b64 || att.b64)){
-            const blob = b64ToBlob(att.image_b64 || att.b64, att.mime || 'image/png');
-            const url = URL.createObjectURL(blob);
-            const metaImg = el('div', {class:'meta'}, `assistant (image)`);
-            const wrap = el('div', {class:'bubble assistant'});
-            const img = new Image();
-            img.src = url; img.alt = 'Image'; img.style.maxWidth = '100%'; img.style.borderRadius = '10px';
-            wrap.appendChild(img);
-            messagesEl.appendChild(metaImg);
-            messagesEl.appendChild(wrap);
-          }
-        });
       });
 
       scrollToBottom();
@@ -488,7 +494,6 @@
         });
 
         const isJSON = (res.headers.get('content-type') || '').includes('application/json');
-
         if (!res.ok || !isJSON){
           typing.remove();
           const errDiv = document.createElement('div');
@@ -584,6 +589,15 @@
     let recStartAt = 0;
     let timerId = 0;
 
+    // Visualizer/overlay refs
+    let audioCtx = null, analyser = null, dataArray = null, rafVis = 0;
+    const recOverlay = document.getElementById('recOverlay');
+    const stopRecBtn = document.getElementById('stopRecBtn');
+    const micBlob = document.getElementById('micBlob');
+    const vu = document.getElementById('vu');
+    const recHelp = document.querySelector('.rec-help');
+    stopRecBtn?.addEventListener('click', () => stopRec());
+
     function pickAudioMime() {
       if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return 'audio/webm;codecs=opus';
       if (MediaRecorder.isTypeSupported('audio/mp4')) return 'audio/mp4';
@@ -599,6 +613,39 @@
     }
     function stopTimer(){ clearInterval(timerId); recTimer.textContent=''; }
 
+    /* ===== Overlay + Visualizer helpers ===== */
+    function showRecOverlay(){ if (recOverlay) recOverlay.classList.add('show'); }
+    function hideRecOverlay(){ if (recOverlay) recOverlay.classList.remove('show'); }
+    function startVisualizer(stream){
+      try{
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const src = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        src.connect(analyser);
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const bars = vu?.querySelectorAll('.vu-bar') || [];
+        const loop = () => {
+          if (!analyser) return;
+          analyser.getByteTimeDomainData(dataArray);
+          let sum = 0; for (let i=0;i<dataArray.length;i++){ const v = dataArray[i]-128; sum += v*v; }
+          const rms = Math.min(1, Math.sqrt(sum / dataArray.length)/64);
+          if (micBlob) micBlob.style.transform = `scale(${1 + Math.min(.7, rms*.6)})`;
+          bars.forEach((b, idx)=>{ const factor = (idx+1)/bars.length; const h = Math.max(6, Math.round((rms*(0.6+0.4*factor))*100)); b.style.height = h+'%'; });
+          rafVis = requestAnimationFrame(loop);
+        };
+        rafVis = requestAnimationFrame(loop);
+      }catch(e){ console.warn('visualizer failed', e); }
+    }
+    function stopVisualizer(){
+      try{ cancelAnimationFrame(rafVis);}catch{}
+      try{ audioCtx && audioCtx.close(); }catch{}
+      audioCtx=null; analyser=null; dataArray=null;
+      if (micBlob) micBlob.style.transform='scale(1)';
+      const bars = vu?.querySelectorAll('.vu-bar')||[];
+      bars.forEach(b=>b.style.height='6%');
+    }
+
     async function startRec() {
       if (recActive) return;
       try {
@@ -609,6 +656,9 @@
         mediaRecorder.ondataavailable = (e) => e.data && recChunks.push(e.data);
         mediaRecorder.onstop = handleStop;
         mediaRecorder.start();
+
+        showRecOverlay();
+        startVisualizer(recStream);
 
         recActive = true;
         recStartAt = performance.now();
@@ -623,16 +673,22 @@
 
     async function stopRec() {
       if (!recActive) return;
+      // Freeze timer and show status
+      stopTimer();
+      if (recHelp) recHelp.textContent = 'Transcribing…';
+      micBtn.disabled = true;
+
       const elapsed = performance.now() - recStartAt;
       if (elapsed < MIN_REC_MS) {
         await new Promise(r => setTimeout(r, MIN_REC_MS - elapsed));
       }
       recActive = false;
-      try { mediaRecorder && mediaRecorder.state !== 'inactive' && mediaRecorder.stop(); } catch {}
+      try { if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); } catch {}
       try { recStream && recStream.getTracks().forEach(t => t.stop()); } catch {}
       micBtn.textContent = '🎤';
       micBtn.style.filter = '';
-      stopTimer();
+      hideRecOverlay();
+      stopVisualizer();
     }
 
     async function handleStop() {
@@ -646,13 +702,12 @@
           messagesEl.appendChild(warn);
           scrollToBottom();
           recChunks = [];
+          micBtn.disabled = false;
+          if (recHelp) recHelp.textContent = 'Recording… click the mic again or press Stop to finish';
           return;
         }
         const form = new FormData();
         form.append('audio', blob, type.includes('mp4') ? 'speech.m4a' : 'speech.webm');
-        // Optional hints:
-        // form.append('language', 'en');
-        // form.append('prompt', 'library, books, titles, authors');
 
         const typing = showAssistantThinking('transcriber');
         const res = await fetch('/api/stt', { method: 'POST', body: form });
@@ -665,14 +720,17 @@
           warn.textContent = data?.message || 'Recording too short.';
           messagesEl.appendChild(warn);
           scrollToBottom();
+          micBtn.disabled = false;
+          if (recHelp) recHelp.textContent = 'Recording… click the mic again or press Stop to finish';
           return;
         }
 
         if (res.ok && data?.text) {
-          if (inputEl.value) inputEl.value += (inputEl.value.endsWith(' ') ? '' : ' ') + data.text.trim();
-          else inputEl.value = data.text.trim();
-          // Auto-send? Uncomment:
-          // document.getElementById('chatForm').requestSubmit();
+          const t = data.text.trim();
+          if (inputEl.value) inputEl.value += (inputEl.value.endsWith(' ') ? '' : ' ') + t;
+          else inputEl.value = t;
+          // Auto-send after transcription
+          document.getElementById('chatForm').requestSubmit();
         } else {
           const warn = document.createElement('div');
           warn.className = 'bubble assistant warning ephemeral';
@@ -689,6 +747,8 @@
         scrollToBottom();
       } finally {
         recChunks = [];
+        micBtn.disabled = false;
+        if (recHelp) recHelp.textContent = 'Recording… click the mic again or press Stop to finish';
       }
     }
 
@@ -697,18 +757,6 @@
       if (!recActive) await startRec();
       else await stopRec();
     });
-
-    // --- Optional micro-batching (live captions) ---
-    // To enable, replace mediaRecorder.start() above with mediaRecorder.start(1000)
-    // and move the upload logic into ondataavailable similar to:
-    // mediaRecorder.ondataavailable = async (e) => {
-    //   if (!e.data || e.data.size < MIN_BLOB_BYTES) return;
-    //   const form = new FormData();
-    //   form.append('audio', e.data, recMime.includes('mp4') ? 'chunk.m4a' : 'chunk.webm');
-    //   const r = await fetch('/api/stt', { method: 'POST', body: form });
-    //   const d = await r.json();
-    //   if (d?.text) inputEl.value = (inputEl.value ? inputEl.value + ' ' : '') + d.text.trim();
-    // };
   </script>
 </body>
 </html>
