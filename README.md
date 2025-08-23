@@ -62,14 +62,20 @@ python main.py
 
 ---
 
-### 🔧Run app with docker(easiest way)
+### 🐳 Running with Docker (recommended)
 
-You can easily use the docker-compose command for out of the box usage.
+You can easily use the docker-compose command for out-of-the-box usage.
+
 To start the container:
 ```bash
 docker-compose up --build
 ```
 
-To stop the container user(using --remove-orphans is optional but it's good practice if redundancies remain)
+To stop the container (using --remove-orphans is optional but good practice if redundancies remain):
 ```bash
 docker-compose down --remove-orphans
+```
+---
+
+### ▶️Usage
+    Once the app is running open your browser at: http://localhost:5000, create an account and ask the assistant your desired book
