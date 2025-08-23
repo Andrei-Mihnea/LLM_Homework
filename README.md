@@ -78,4 +78,6 @@ docker-compose down --remove-orphans
 ---
 
 ### ▶️Usage
-    Once the app is running open your browser at: http://localhost:5000, create an account and ask the assistant your desired book
+
+Once the app is running open your browser at: http://localhost:5000, create an account and ask the assistant your desired
+book
