@@ -11,9 +11,11 @@ Built with the tools and technologies:
 
 ## 📑 Table of Contents
 - [Overview](#overview)
+- [Screenshots](#screenshots)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
+  - [Running with Docker](#-running-with-docker-recommended)
 - [Usage](#usage)
 - [Testing](#testing)
 - [License](#license)
@@ -22,26 +24,43 @@ Built with the tools and technologies:
 
 ## 🔍 Overview
 
-**Librarian Assistant** is an AI-powered toolkit for building a conversational **smart librarian assistant**.  
-It combines **Retrieval-Augmented Generation (RAG)** with **custom tool completion**, enabling AI to fetch book information, provide summaries, and interact intelligently with user queries.
+**Librarian Assistant** is an AI-powered conversational system that acts as a **smart book buddy**.  
+It provides **book recommendations, summaries, and thematic exploration** using **Retrieval-Augmented Generation (RAG)** combined with **tool completion**.  
 
-### ✨ Core Features
-- 🧩 **Modular Architecture** – Separation of controllers, views, and services for scalable development.  
-- 📖 **AI-Powered Library Assistance** – Uses OpenAI LLMs with **ChromaDB** as a vector store for semantic search.  
-- 🔒 **Secure Authentication** – JWT-based login and session management (planned).  
-- 🌐 **REST API** – Flask backend with modular API endpoints for assistant interaction.  
-- 📦 **Containerized Deployment** – Ready-to-run with **Docker** and **Docker Compose**.  
+---
+
+## 📸 Screenshots
+
+### 🔑 Login & Registration
+![Login](/mnt/data/4db82df1-1e31-408e-a0bc-6a2e6b877152.png)
+
+### 💬 Conversational Interface
+![Chat](/mnt/data/39b7920c-79b1-4c21-a20a-ed74ed42e74f.png)
+
+### ⚙️ Options Menu
+![Options](/mnt/data/bb8a8501-3d0c-44fc-9bdd-6d922dd98127.png)
+
+### 🖼️ Book Cover Generation
+![Image Generation](/mnt/data/e12639a3-11f3-4a57-be6c-c39e94cd14ba.png)
+
+### 🎤 Voice Interaction
+![Voice Input](/mnt/data/8b80c716-3430-4abe-8d08-d015a5b389fe.png)
+
+### 🚫 Moderation
+![Moderation](/mnt/data/88c90cd0-07a0-4758-9b12-fb401daed01f.png)
+
+### 🖼️ AI Responses with Images & Audio
+![Response](/mnt/data/55a5b333-6bba-4fe9-9a80-ef17e24eb07c.png)
 
 ---
 
 ## 🚀 Getting Started
 
 ### ✅ Prerequisites
-Make sure you have installed:
-- **Programming Language**: Python 3.10+  
-- **Package Manager**: `pip`  
-- **Container Runtime**: Docker (optional, for deployment)  
-- **OpenAI API Key** (required for LLM functionality)  
+- **Python** 3.10+  
+- **pip**  
+- **Docker** (optional)  
+- **OpenAI API Key** (required)  
 
 ---
 
@@ -52,10 +71,6 @@ Clone the repository and install dependencies:
 ```bash
 git clone https://github.com/Andrei-Mihnea/LLM_Homework.git
 cd LLM_Homework
-
-```
-If you want to run the project on your machine without the use of docker run the command:
-```bash
 pip install -r requirements.txt
 python main.py
 ```
@@ -64,20 +79,44 @@ python main.py
 
 ### 🐳 Running with Docker (recommended)
 
-You can easily use the docker-compose command for out-of-the-box usage.
-
-To start the container:
+Start the container:
 ```bash
 docker-compose up --build
 ```
 
-To stop the container (using --remove-orphans is optional but good practice if redundancies remain):
+Stop the container:
 ```bash
 docker-compose down --remove-orphans
 ```
+
 ---
 
-### ▶️Usage
+## ▶️ Usage
 
-Once the app is running open your browser at: http://localhost:5000, create an account and ask the assistant your desired
-book
+1. Open the app at 👉 [http://localhost:5000](http://localhost:5000)  
+2. Create an account or log in  
+3. Ask for book recommendations, summaries, or thematic explorations  
+4. Try advanced options like **image generation** and **audio replies**  
+
+Example API call:
+```bash
+curl -X POST http://localhost:5000/api/assistant   -H "Content-Type: application/json"   -d '{"query": "Suggest a book about magic and friendship"}'
+```
+
+---
+
+## 🧪 Testing
+
+```bash
+pytest
+```
+
+With Docker:
+```bash
+docker-compose run --rm app pytest
+```
+
+---
+
+## 📜 License
+This project is licensed under the MIT License – see the [LICENSE](./LICENSE) file for details.

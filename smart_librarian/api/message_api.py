@@ -240,7 +240,7 @@ Be strict about sources. Friendly tone, but accuracy first.
     image_generation_requested = bool(data.get("image_enable"))
     image_generation_text = (text_response or "").strip()
 
-    if image_generation_requested and image_generation_text and summary_text:
+    if image_generation_requested and image_generation_text :
         try:
             # Use the Images API to get a base64 PNG (compact & predictable)
             img = client.images.generate(
@@ -254,6 +254,7 @@ Be strict about sources. Friendly tone, but accuracy first.
             text_response += f"<image type=\"image/png\">{image_b64}</image>"
         except Exception as e:
             # Optional: add a small notice in the text; or ignore silently
+            print(e)
             text_response += "\n\n[Image generation failed]"
         
     assistant_response += text_response
