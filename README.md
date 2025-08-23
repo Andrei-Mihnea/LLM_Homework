@@ -32,25 +32,25 @@ It provides **book recommendations, summaries, and thematic exploration** using 
 ## 📸 Screenshots
 
 ### 🔑 Login & Registration
-![Login](/mnt/data/4db82df1-1e31-408e-a0bc-6a2e6b877152.png)
+![Login](screenshots/login.png)
 
 ### 💬 Conversational Interface
-![Chat](/mnt/data/39b7920c-79b1-4c21-a20a-ed74ed42e74f.png)
+![Home](screenshots/home.png)
 
 ### ⚙️ Options Menu
-![Options](/mnt/data/bb8a8501-3d0c-44fc-9bdd-6d922dd98127.png)
+![Options](screenshots/options.png)
 
 ### 🖼️ Book Cover Generation
-![Image Generation](/mnt/data/e12639a3-11f3-4a57-be6c-c39e94cd14ba.png)
+![Image Generation](screenshots/image_generation.png)
 
 ### 🎤 Voice Interaction
-![Voice Input](/mnt/data/8b80c716-3430-4abe-8d08-d015a5b389fe.png)
+![Voice Input](screenshots/voice.png)
 
 ### 🚫 Moderation
-![Moderation](/mnt/data/88c90cd0-07a0-4758-9b12-fb401daed01f.png)
+![Moderation](screenshots/moderation.png)
 
 ### 🖼️ AI Responses with Images & Audio
-![Response](/mnt/data/55a5b333-6bba-4fe9-9a80-ef17e24eb07c.png)
+![Response](screenshots/conversation.png)
 
 ---
 
@@ -116,7 +116,3 @@ With Docker:
 docker-compose run --rm app pytest
 ```
 
----
-
-## 📜 License
-This project is licensed under the MIT License – see the [LICENSE](./LICENSE) file for details.
