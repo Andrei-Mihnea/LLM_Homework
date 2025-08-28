@@ -74,7 +74,10 @@ cd LLM_Homework
 pip install -r requirements.txt
 python main.py
 ```
-
+And for the API key create an .env file and inside of it do this
+```
+OPENAI_API_KEY=YOUR_API_KEY
+```
 ---
 
 ### 🐳 Running with Docker (recommended)

@@ -2,7 +2,7 @@ import os
 import bcrypt
 from flask import request, redirect, make_response
 from sqlalchemy.exc import IntegrityError
-from smart_librarian.models.user_db import SessionLocal, User
+from smart_librarian.database.user_db import SessionLocal, User
 from smart_librarian.utils.jwt_helper import create_jwt
 
 COOKIE_NAME = "access_token"

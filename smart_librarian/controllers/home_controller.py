@@ -2,7 +2,7 @@
 from flask import render_template
 from smart_librarian.utils.auth_guard import current_user
 from smart_librarian.models.book_model import load_summaries, build_vectorstore
-from smart_librarian.models.chat_db import Conversation
+from smart_librarian.database.chat_db import Conversation
 from openai import OpenAI
 import os
 

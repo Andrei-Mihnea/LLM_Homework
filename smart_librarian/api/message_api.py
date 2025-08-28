@@ -2,7 +2,7 @@
 from flask import Blueprint, request, jsonify,Response
 from smart_librarian.utils.auth_guard import current_user
 from smart_librarian.utils.message_helper import check_profanity,sanitize_ctx_messages,to_b64
-from smart_librarian.models.chat_db import Conversation
+from smart_librarian.database.chat_db import Conversation
 import json
 from uuid import uuid4
 from openai import OpenAI
