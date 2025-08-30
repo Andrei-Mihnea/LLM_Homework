@@ -1,5 +1,6 @@
 import base64
 import re
+from flask import jsonify
 
 # Compile once at module import time
 AUDIO_TAG_RE   = re.compile(r"<audio(?:\s+[^>]*)?>.*?</audio>", re.IGNORECASE | re.DOTALL)
@@ -54,8 +55,13 @@ def sanitize_ctx_messages(messages: list[dict]) -> list[dict]:
         cleaned.append(out)
 
     return cleaned
-
+    
 def to_b64(maybe_bytes):
     if not maybe_bytes:
         return None
     return base64.b64encode(maybe_bytes).decode("ascii")
+
+
+def api_error(msg="The AI service is unavailable right now. Please try again soon.", code=503, kind="api_unavailable"):
+    resp = jsonify({"error": kind, "message": msg})
+    return resp, code

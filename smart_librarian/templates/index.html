@@ -102,10 +102,89 @@
     .vu{display:flex;gap:6px;align-items:flex-end;justify-content:center;height:56px;margin:16px 0 10px}
     .vu-bar{width:10px;height:6%;border-radius:6px;background:linear-gradient(180deg,var(--accent3),var(--accent1));opacity:.9;box-shadow:0 1px 8px rgba(82,230,185,.2)}
     .rec-help{color:var(--muted);margin-bottom:10px}
+
+    /* ===== API DOWN ALERT ===== */
+    .alert-wrap{position:fixed;left:0;right:0;top:16px;display:flex;justify-content:center;z-index:1000;pointer-events:none}
+    .alert-card{
+      pointer-events:auto;
+      width:min(760px,92vw);
+      border:1px solid var(--border);
+      border-radius:16px;
+      background:
+        radial-gradient(1000px 1000px at -10% -20%, rgba(124,153,255,.15), transparent 40%),
+        radial-gradient(1000px 1000px at 120% 120%, rgba(82,230,185,.14), transparent 40%),
+        linear-gradient(180deg,#101522 0%, #0c1018 100%);
+      box-shadow:0 20px 60px rgba(0,0,0,.55);
+      padding:14px 16px;
+      display:grid;
+      grid-template-columns:auto 1fr auto;
+      gap:14px;
+      align-items:center;
+      animation:slideDown .25s ease;
+    }
+    @keyframes slideDown{from{transform:translateY(-12px);opacity:0}to{transform:translateY(0);opacity:1}}
+    .alert-icon{
+      width:42px;height:42px;border-radius:12px;
+      background:conic-gradient(from 0deg, var(--danger), #ffb3c0, var(--danger));
+      mask: radial-gradient(circle at 50% 50%, transparent 45%, black 46%);
+      position:relative;
+    }
+    .alert-icon::after{
+      content:"!"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      font-weight:900; color:#0b0d10; text-shadow:0 1px 0 rgba(255,255,255,.2); font-size:20px;
+    }
+    .alert-title{font-weight:800; margin:0; font-size:16px}
+    .alert-msg{margin:2px 0 0; color:#c7cfdb; font-size:14px}
+    .alert-actions{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    .alert-actions .chip{ margin-right:auto; } /* <<< push the Network chip to the far left */
+    .btn-ghost{padding:10px 12px;border-radius:10px;border:1px solid var(--border); background:#151b26;color:#e8edf2;cursor:pointer;font-weight:700}
+    .btn-gradient{padding:10px 12px;border-radius:10px;border:0;background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#0b0d10;font-weight:800;cursor:pointer}
+    .alert-details{grid-column:1 / -1;display:none;border-top:1px dashed rgba(255,255,255,.08);margin-top:8px;padding-top:10px;color:#9fb3c8;font-size:13px;white-space:pre-wrap;word-break:break-word}
+    .alert-card.open .alert-details{display:block}
+
+    /* Bottom toast for small errors */
+    .toast{
+      position:fixed;left:50%;bottom:14px;transform:translateX(-50%);
+      background:#121825;border:1px solid var(--border);border-radius:12px;padding:10px 14px;
+      box-shadow:0 10px 30px rgba(0,0,0,.45);z-index:900;display:none;max-width:90vw
+    }
+    .toast.show{display:block}
+
+    /* ===== Compact status chips (top bar & alert) ===== */
+    .status-chip,
+    .chip.dot{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      font-size:12px;
+      color:#cdd6e2;
+      border:1px solid var(--border);
+      padding:4px 8px;
+      border-radius:999px;
+      background:#131926;
+      line-height:1.2;
+      white-space:nowrap;
+    }
+    .status-led,
+    .dot-signal{
+      width:10px;
+      height:10px;
+      border-radius:50%;
+      flex-shrink:0;
+    }
+    .status-led{background:var(--accent3)}
+    .status-led.off{background:var(--danger)}
+    .dot-signal{background:var(--danger);box-shadow:0 0 0 0 rgba(255,123,148,.6);animation:pulseDot 1.8s ease infinite}
+    .dot-signal.ok{background:var(--accent3);box-shadow:0 0 0 0 rgba(82,230,185,.35)}
+    @keyframes pulseDot{0%{box-shadow:0 0 0 0 rgba(255,123,148,.5)}70%{box-shadow:0 0 0 10px rgba(255,123,148,0)}100%{box-shadow:0 0 0 0 rgba(255,123,148,0)}}
   </style>
 </head>
 <body>
   <div class="backdrop" id="backdrop"></div>
+
+  <!-- API Down alert container -->
+  <div class="alert-wrap" id="apiAlert"></div>
+  <div class="toast" id="toast"></div>
 
   <div class="layout">
     <!-- Sidebar -->
@@ -130,7 +209,11 @@
           <button class="hamburger" id="openSide">☰</button>
           <span id="chatTitle" style="color:#9fb3c8">No chat selected</span>
         </div>
-        <div class="nav-links">
+        <div class="nav-links" style="gap:10px;align-items:center">
+          <span class="status-chip" id="netStatus">
+            <span class="status-led" id="netLed"></span>
+            <span id="netText">Online</span>
+          </span>
           <a style="color:var(--accent3);text-decoration:none" href="/home/index">Home</a>
           <a class="logout-btn" href="/auth/logout">Logout</a>
         </div>
@@ -202,6 +285,12 @@
     const ttsToggle    = document.getElementById('ttsToggle');
     const imgToggle    = document.getElementById('imgToggle');
 
+    // Alerts / status
+    const apiAlert = document.getElementById('apiAlert');
+    const toastEl  = document.getElementById('toast');
+    const netLed   = document.getElementById('netLed');
+    const netText  = document.getElementById('netText');
+
     let currentConvId = null;
 
     /* ---------- helpers ---------- */
@@ -213,6 +302,22 @@
     }
     function scrollToBottom(){ messagesEl.scrollTop = messagesEl.scrollHeight; }
     function fmtTime(s){ s = Math.max(0, s|0); const m=(s/60)|0; const r=(s%60)|0; return `${m}:${r.toString().padStart(2,'0')}`; }
+
+    function showToast(msg, ms=2600){
+      if (!toastEl) return;
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      setTimeout(()=>toastEl.classList.remove('show'), ms);
+    }
+
+    function setNetStatus(){
+      const online = navigator.onLine;
+      if (online){ netLed.classList.remove('off'); netText.textContent='Online'; }
+      else { netLed.classList.add('off'); netText.textContent='Offline'; }
+    }
+    window.addEventListener('online', setNetStatus);
+    window.addEventListener('offline', setNetStatus);
+    setNetStatus();
 
     // client-side sanitization to hide accidental <audio> / <image> tags and huge base64 from text
     function sanitizeForDisplay(text){
@@ -257,6 +362,84 @@
       return new Blob([bytes], {type: mime});
     }
 
+    /* ---------- Nice API error UI ---------- */
+    let retryTimer = 0, retryLeft = 0, backoffMs = 3000;
+
+    function hideApiDown(){
+      if (apiAlert) apiAlert.innerHTML='';
+      clearInterval(retryTimer); retryTimer=0;
+    }
+
+    function showApiDown({title="Service unavailable", message="The assistant can’t reach the Smart Librarian API right now.", details="", onRetry}={}){
+      hideApiDown();
+
+      const card = el('div', {class:'alert-card', role:'alert', 'aria-live':'assertive'});
+      const icon = el('div', {class:'alert-icon'});
+      const textWrap = el('div', {});
+      const actions = el('div', {class:'alert-actions'});
+
+      const h = el('h3', {class:'alert-title'}, title);
+      const p = el('p', {class:'alert-msg'}, message);
+      textWrap.appendChild(h); textWrap.appendChild(p);
+
+      const chip = el('span', {class:'chip dot'}, `<span class="dot-signal${navigator.onLine ? ' ok':''}"></span> Network ${navigator.onLine ? 'OK' : 'Offline'}`);
+      const retryBtn = el('button', {class:'btn-gradient', type:'button', id:'retryBtn'}, 'Retry');
+      const detailBtn = el('button', {class:'btn-ghost', type:'button', id:'detailBtn'}, 'Show details');
+      const detailsBox = el('div', {class:'alert-details'}, details || 'No additional details.');
+
+      actions.appendChild(chip);
+      actions.appendChild(detailBtn);
+      actions.appendChild(retryBtn);
+
+      card.appendChild(icon);
+      card.appendChild(textWrap);
+      card.appendChild(actions);
+      card.appendChild(detailsBox);
+
+      apiAlert.appendChild(card);
+
+      detailBtn.addEventListener('click', ()=>{
+        card.classList.toggle('open');
+        detailBtn.textContent = card.classList.contains('open') ? 'Hide details' : 'Show details';
+      });
+
+      const doRetry = async ()=>{
+        clearInterval(retryTimer); retryTimer=0;
+        if (typeof onRetry === 'function'){
+          try{
+            await onRetry();
+            hideApiDown();
+            showToast('Reconnected.');
+            backoffMs = 3000; // reset backoff on success
+          }catch(e){
+            backoffMs = Math.min(20000, Math.round(backoffMs * 1.6));
+            startAutoRetry();
+          }
+        }
+      };
+      retryBtn.addEventListener('click', doRetry);
+
+      function startAutoRetry(){
+        retryLeft = Math.round(backoffMs/1000);
+        retryBtn.disabled = true;
+        retryBtn.textContent = `Retry in ${retryLeft}s`;
+        clearInterval(retryTimer);
+        retryTimer = setInterval(()=>{
+          retryLeft -= 1;
+          if (retryLeft <= 0){
+            clearInterval(retryTimer);
+            retryBtn.disabled = false;
+            retryBtn.textContent = 'Retry';
+            doRetry();
+          } else {
+            retryBtn.textContent = `Retry in ${retryLeft}s`;
+          }
+        }, 1000);
+      }
+
+      startAutoRetry();
+    }
+
     /* ---------- typing / thinking helper ---------- */
     function showAssistantThinking(label='assistant'){
       const meta = el('div', {class:'meta'}, `${label} (typing)`);
@@ -274,38 +457,90 @@
       return { remove(){ if (meta.parentNode) meta.parentNode.removeChild(meta); if (bubble.parentNode) bubble.parentNode.removeChild(bubble); } };
     }
 
+    /* ---------- unified fetch wrapper ---------- */
+    async function fetchJSON(url, options){
+      const started = Date.now();
+      try{
+        const res = await fetch(url, options);
+        const ct = res.headers.get('content-type') || '';
+        if (!res.ok){
+          let bodyText = '';
+          try { bodyText = await res.text(); } catch {}
+          const err = new Error(`HTTP ${res.status} ${res.statusText}`);
+          err.status = res.status;
+          err.body = bodyText;
+          err.duration = Date.now() - started;
+          throw err;
+        }
+        if (!ct.includes('application/json')){
+          const err = new Error('Invalid response type');
+          err.status = -1;
+          err.body = '';
+          err.duration = Date.now() - started;
+          throw err;
+        }
+        const json = await res.json();
+        return json;
+      } catch(e){
+        e.duration = e.duration || (Date.now() - started);
+        throw e;
+      }
+    }
+
     /* ---------- list & conversations ---------- */
     async function loadList(){
-      const r = await fetch('/api/list');
-      const data = await r.json();
-      convList.innerHTML = '';
-      if (!data.conversations?.length){
-        convList.innerHTML = '<div class="row">No conversations yet.</div>';
-        return;
-      }
-      for (const c of data.conversations){
-        const row = el('div', {class:'row'});
-        const open = el('button', {type:'button', style:'all:unset;cursor:pointer;color:var(--accent3)'}, c.title);
-        open.addEventListener('click', () => openConv(c.id));
-        const meta = el('small', {}, `Updated ${c.updated_at}`);
-        const delForm = el('form', {style:'margin-top:8px'});
-        const delBtn = el('button', {class:'danger', type:'button'}, 'Delete');
-        delBtn.addEventListener('click', () => deleteConv(c.id));
-        delForm.appendChild(delBtn);
-        row.appendChild(open);
-        row.appendChild(meta);
-        row.appendChild(delForm);
-        convList.appendChild(row);
+      try{
+        const data = await fetchJSON('/api/list');
+        convList.innerHTML = '';
+        if (!data.conversations?.length){
+          convList.innerHTML = '<div class="row">No conversations yet.</div>';
+          return;
+        }
+        for (const c of data.conversations){
+          const row = el('div', {class:'row'});
+          const open = el('button', {type:'button', style:'all:unset;cursor:pointer;color:var(--accent3)'}, c.title);
+          open.addEventListener('click', () => openConv(c.id));
+          const meta = el('small', {}, `Updated ${c.updated_at}`);
+          const delForm = el('form', {style:'margin-top:8px'});
+          const delBtn = el('button', {class:'danger', type:'button'}, 'Delete');
+          delBtn.addEventListener('click', () => deleteConv(c.id));
+          delForm.appendChild(delBtn);
+          row.appendChild(open);
+          row.appendChild(meta);
+          row.appendChild(delForm);
+          convList.appendChild(row);
+        }
+      } catch(err){
+        const detail = [
+          `Endpoint: /api/list`,
+          `Status: ${err.status ?? 'n/a'}`,
+          `Duration: ${err.duration}ms`,
+          (err.body ? `Body: ${err.body.slice(0,400)}` : '')
+        ].filter(Boolean).join('\n');
+        showApiDown({
+          title:'Can’t load your conversations',
+          message:'Looks like the API is not responding.',
+          details: detail,
+          onRetry: loadList
+        });
       }
     }
 
     async function openConv(id){
-      const r = await fetch('/api/open', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({conv_id:id}) });
-      const data = await r.json();
-      if (data.error) return;
-      currentConvId = data.conv.id;
-      chatTitle.textContent = `#${data.conv.id}  ${data.conv.title}`;
-      renderMessages(data.conv.messages || []);
+      try{
+        const data = await fetchJSON('/api/open', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({conv_id:id}) });
+        if (data.error) return;
+        currentConvId = data.conv.id;
+        chatTitle.textContent = `#${data.conv.id}  ${data.conv.title}`;
+        renderMessages(data.conv.messages || []);
+      } catch(err){
+        showApiDown({
+          title:'Unable to open conversation',
+          message:'The API call failed.',
+          details:`Endpoint: /api/open\nStatus: ${err.status}\nDuration: ${err.duration}ms\n${(err.body||'').slice(0,400)}`,
+          onRetry: ()=>openConv(id)
+        });
+      }
     }
 
     function renderMessages(list){
@@ -363,21 +598,37 @@
     }
 
     async function deleteConv(id){
-      await fetch('/api/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({conv_id:id}) });
-      if (currentConvId === id) {
-        currentConvId = null;
-        chatTitle.textContent = 'No chat selected';
-        messagesEl.innerHTML = '';
+      try{
+        await fetchJSON('/api/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({conv_id:id}) });
+        if (currentConvId === id) {
+          currentConvId = null;
+          chatTitle.textContent = 'No chat selected';
+          messagesEl.innerHTML = '';
+        }
+        await loadList();
+      } catch(err){
+        showToast('Delete failed.');
       }
-      await loadList();
     }
 
     newBtn?.addEventListener('click', async (e) => {
       e.preventDefault();
-      const r = await fetch('/api/new', {method:'POST'});
-      const data = await r.json();
-      await loadList();
-      await openConv(data.conv.id);
+      try{
+        const data = await fetchJSON('/api/new', {method:'POST'});
+        await loadList();
+        await openConv(data.conv.id);
+      } catch(err){
+        showApiDown({
+          title:'Unable to start a new chat',
+          message:'The API didn’t respond.',
+          details:`Endpoint: /api/new\nStatus: ${err.status}\nDuration: ${err.duration}ms\n${(err.body||'').slice(0,400)}`,
+          onRetry: async ()=>{
+            const d = await fetchJSON('/api/new', {method:'POST'});
+            await loadList();
+            await openConv(d.conv.id);
+          }
+        });
+      }
     });
 
     /* ---------- Options popup events ---------- */
@@ -482,7 +733,7 @@
       const typing = showAssistantThinking();
 
       try {
-        const res = await fetch('/api/send', {
+        const data = await fetchJSON('/api/send', {
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body: JSON.stringify({
@@ -493,57 +744,57 @@
           })
         });
 
-        const isJSON = (res.headers.get('content-type') || '').includes('application/json');
-        if (!res.ok || !isJSON){
-          typing.remove();
-          const errDiv = document.createElement('div');
-          errDiv.className = 'bubble assistant warning ephemeral';
-          errDiv.style.borderColor = 'rgba(255,0,0,.3)';
-          errDiv.textContent = 'Failed to send. Please try again.';
-          messagesEl.appendChild(errDiv);
-          return;
-        }
-
-        const data = await res.json();
         typing.remove();
 
-        if (data.error) return;
+        if (data.error) {
+          showApiDown({
+            title:'The assistant could not process your message',
+            message:'The API returned an error.',
+            details:`Endpoint: /api/send\nPayload: message + toggles\nServer error: ${JSON.stringify(data).slice(0,400)}`,
+            onRetry: async ()=>{
+              const d = await fetchJSON('/api/send', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({
+                  message: text,
+                  conv_id: currentConvId,
+                  tts_enable: !!(ttsToggle && ttsToggle.checked),
+                  image_enable: !!(imgToggle && imgToggle.checked)
+                })
+              });
+              currentConvId = d.conv.id;
+              renderMessages(d.messages || []);
+              await loadList();
+            }
+          });
+          return;
+        }
 
         currentConvId = data.conv.id;
         renderMessages(data.messages || []);
-
-        if (data.profanity_warning) {
-          const metaUser = document.createElement('div');
-          metaUser.className = 'meta';
-          metaUser.textContent = 'you (not saved)';
-          const bubbleUser = document.createElement('div');
-          bubbleUser.className = 'bubble user ephemeral';
-          bubbleUser.textContent = data.ephemeral_user_message || '';
-          messagesEl.appendChild(metaUser);
-          messagesEl.appendChild(bubbleUser);
-
-          const metaWarn = document.createElement('div');
-          metaWarn.className = 'meta';
-          metaWarn.textContent = 'assistant (warning)';
-          const bubbleWarn = document.createElement('div');
-          bubbleWarn.className = 'bubble assistant warning ephemeral';
-          bubbleWarn.setAttribute('role','alert');
-          bubbleWarn.textContent = data.profanity_warning;
-          messagesEl.appendChild(metaWarn);
-          messagesEl.appendChild(bubbleWarn);
-
-          scrollToBottom();
-          await loadList();
-          return;
-        }
-
         await loadList();
       } catch (err) {
         typing.remove();
-        const errDiv = document.createElement('div');
-        errDiv.className = 'bubble assistant warning ephemeral';
-        errDiv.textContent = 'Network error. Please check your connection and try again.';
-        messagesEl.appendChild(errDiv);
+        showApiDown({
+          title:'Can’t reach the Smart Librarian API',
+          message:'Your message was not sent.',
+          details:`Endpoint: /api/send\nStatus: ${err.status}\nDuration: ${err.duration}ms\n${(err.body||'').slice(0,400)}`,
+          onRetry: async ()=>{
+            const d = await fetchJSON('/api/send', {
+              method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({
+                message: text,
+                conv_id: currentConvId,
+                tts_enable: !!(ttsToggle && ttsToggle.checked),
+                image_enable: !!(imgToggle && imgToggle.checked)
+              })
+            });
+            currentConvId = d.conv.id;
+            renderMessages(d.messages || []);
+            await loadList();
+          }
+        });
       }
     });
 
@@ -729,22 +980,32 @@
           const t = data.text.trim();
           if (inputEl.value) inputEl.value += (inputEl.value.endsWith(' ') ? '' : ' ') + t;
           else inputEl.value = t;
-          // Auto-send after transcription
           document.getElementById('chatForm').requestSubmit();
         } else {
-          const warn = document.createElement('div');
-          warn.className = 'bubble assistant warning ephemeral';
-          warn.textContent = 'Transcription failed.';
-          messagesEl.appendChild(warn);
-          scrollToBottom();
+          showApiDown({
+            title:'Transcription failed',
+            message:'The speech-to-text endpoint is unavailable.',
+            details:`Endpoint: /api/stt\nHTTP: ${res.status}\n${JSON.stringify(data).slice(0,400)}`,
+            onRetry: async ()=>{
+              const r2 = await fetch('/api/stt', { method: 'POST', body: form });
+              const d2 = await r2.json();
+              if (r2.ok && d2?.text){
+                inputEl.value = d2.text.trim();
+                document.getElementById('chatForm').requestSubmit();
+              } else {
+                throw new Error('Retry failed');
+              }
+            }
+          });
         }
       } catch (e) {
         console.error(e);
-        const warn = document.createElement('div');
-        warn.className = 'bubble assistant warning ephemeral';
-        warn.textContent = 'Transcription error.';
-        messagesEl.appendChild(warn);
-        scrollToBottom();
+        showApiDown({
+          title:'Transcription error',
+          message:'We could not reach the STT service.',
+          details:String(e).slice(0,400),
+          onRetry: handleStop
+        });
       } finally {
         recChunks = [];
         micBtn.disabled = false;
